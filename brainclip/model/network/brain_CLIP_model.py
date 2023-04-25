@@ -30,18 +30,20 @@ class TextEncoder(nn.Module):
         return x
 
 # Define the CLIP model architecture
-class CLIP(nn.Module):
-    def __init__(self, image_encoder, text_encoder):
-        super(CLIP, self).__init__()
+class BrainCLIP(nn.Module):
+    def __init__(self, image_encoder, text_encoder, num_classes):
+        super(BrainCLIP, self).__init__()
         self.image_encoder = image_encoder
         self.text_encoder = text_encoder
         self.embedding_layer = nn.Linear(in_features=2048, out_features=1024)
+        self.classification_layer = nn.Linear(in_features=1024, out_features=num_classes)
 
-    def forward(self, image, input_ids, attention_mask):
+    def forward(self, image, report, attention_mask):
         image_embedding = self.image_encoder(image)
-        text_embedding = self.text_encoder(input_ids, attention_mask)
+        text_embedding = self.text_encoder(report, attention_mask)
         joint_embedding = torch.cat((image_embedding, text_embedding), dim=1)
         joint_embedding = self.embedding_layer(joint_embedding)
-        return joint_embedding # TODO what to do with this embedding?
-
+        logits = self.classification_layer(joint_embedding)
+        class_probs = nn.functional.softmax(logits, dim=-1)
+        return class_probs
     
