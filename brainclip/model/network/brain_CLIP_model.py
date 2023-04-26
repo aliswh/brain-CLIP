@@ -38,9 +38,9 @@ class BrainCLIP(nn.Module):
         self.embedding_layer = nn.Linear(in_features=2048, out_features=1024)
         self.classification_layer = nn.Linear(in_features=1024, out_features=num_classes)
 
-    def forward(self, image, report, attention_mask):
+    def forward(self, image, input_id_report, attention_mask_report):
         image_embedding = self.image_encoder(image)
-        text_embedding = self.text_encoder(report, attention_mask)
+        text_embedding = self.text_encoder(input_id_report, attention_mask_report)
         joint_embedding = torch.cat((image_embedding, text_embedding), dim=1)
         joint_embedding = self.embedding_layer(joint_embedding)
         logits = self.classification_layer(joint_embedding)
