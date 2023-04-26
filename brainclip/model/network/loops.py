@@ -26,9 +26,11 @@ if fine_tune:
             else:
                 param.requires_grad = True
 
+
 for epoch in range(num_epochs):
     i = 0
     for images, input_id_report, attention_mask_report, labels in train_loader:
+        print(labels)
         optimizer.zero_grad()
         outputs = model(images, input_id_report, attention_mask_report)
         loss = criterion(outputs, labels)

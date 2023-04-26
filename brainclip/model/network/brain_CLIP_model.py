@@ -5,10 +5,10 @@ from torchvision.models.video import r3d_18
 
 # Define the text encoder using the pretrained 3DResNet on Kinetic400 (r3d_18)
 class ImageEncoder(nn.Module):
-    def __init__(self, embedding_size=1024):
+    def __init__(self, embedding_size=512):
         super(ImageEncoder, self).__init__()
         self.resnet3d = r3d_18(pretrained=True)
-        self.embedding_layer = nn.Linear(in_features=512, out_features=embedding_size)
+        self.embedding_layer = nn.Linear(in_features=400, out_features=400)
 
     def forward(self, x):
         x = self.resnet3d(x)
@@ -17,13 +17,13 @@ class ImageEncoder(nn.Module):
 
 # Define the text encoder using the pretrained DistilBERT
 class TextEncoder(nn.Module):
-    def __init__(self, embedding_size=1024):
+    def __init__(self, embedding_size=512):
         super(TextEncoder, self).__init__()
         self.distilbert = DistilBertModel.from_pretrained('distilbert-base-uncased')
         self.embedding_layer = nn.Linear(in_features=768, out_features=embedding_size)
 
-    def forward(self, input_ids, attention_mask):
-        outputs = self.distilbert(input_ids=input_ids, attention_mask=attention_mask)
+    def forward(self, input_id_report, attention_mask_report):
+        outputs = self.distilbert(input_ids=input_id_report, attention_mask=attention_mask_report)
         last_hidden_state = outputs.last_hidden_state
         pooled_output = outputs.pooler_output
         x = self.embedding_layer(pooled_output)
