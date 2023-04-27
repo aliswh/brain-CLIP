@@ -6,22 +6,14 @@ import torch.nn.functional as F
 from transformers import DistilBertTokenizer
 import matplotlib.pyplot as plt
 
-def update_png(loss_history):
+def update_png(loss_history, prefix=""):
     plt.plot(range(len(loss_history)), loss_history)
-    plt.savefig("/datadrive_m2/alice/brain-CLIP/brainclip/model/network/loss.png")
+    plt.savefig(f"/datadrive_m2/alice/brain-CLIP/brainclip/model/network/{prefix}_loss.png")
 
-def pad_tensor(t):
-    max_len = 480 # TODO
-    t = F.pad(t, (0, max_len - t.size(0)), mode='constant', value=0)
-    return t
-
-def tokenize(text):
+def tokenize(text_batch):
     tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-    encoded_input = tokenizer(text, return_tensors='pt')
-    input_id, attention_mask = encoded_input["input_ids"], encoded_input["attention_mask"]
-    input_id = pad_tensor(input_id)
-    attention_mask = pad_tensor(attention_mask)
-    return input_id, attention_mask
+    encoded_batch = tokenizer(text_batch, padding="max_length", return_tensors='pt')
+    return encoded_batch
 
 def one_hot_encoding(labels):
     al = len(labels)
@@ -44,18 +36,29 @@ def load_dataset(split_type):
     with open(json_path, "r") as f: 
         json_file = json.load(f) 
     
+    report_batch = [[],[]] # to be tokenized later
     
     for key, value in json_file.items():
+        key = int(key)
         image, report, label = value["name"], value["report"], value["label"]
 
         image = nib.load(image).get_fdata()
         image = torch.Tensor(image)
         image = torch.stack((image, image, image)) # TODO replace with 3 different sequences
 
-        input_id_report, attention_mask_report = tokenize(report)
+        report_batch[0].append(key) 
+        report_batch[1].append(report)
+
         label = one_hot[label]
 
-        dataset[int(key)] = (image, input_id_report, attention_mask_report, label)
+        dataset[key] = [image, None, label]
+
+    # tokenize batch of documents
+    tokenized_batch = tokenize(report_batch[1])
+    
+    for idx, key in enumerate(report_batch[0]):
+        tokenized_report = [tokenized_batch[d][idx] for d in ["input_ids","attention_mask"]]
+        dataset[key] = (dataset[key][0], *tokenized_report, dataset[key][2])
 
     return dataset
 

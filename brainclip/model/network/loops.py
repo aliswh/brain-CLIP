@@ -1,8 +1,11 @@
 from brainclip.config import *
+from brainclip.model.utils.file_utils import update_png
 from brainclip.model.network.brain_CLIP_model import ImageEncoder, TextEncoder, BrainCLIP
 from brainclip.model.network.data_loader import BrainCLIPDataLoader
 import torch.nn as nn
 from torch.optim import Adam
+import torch
+
 
 
 num_epochs = 1
@@ -28,18 +31,18 @@ if fine_tune:
                 param.requires_grad = True
 
 
+num_epochs = 50
+loss_history = []
+
 for epoch in range(num_epochs):
-    i = 0
     for images, input_id_report, attention_mask_report, labels in train_loader:
-        print(labels)
         optimizer.zero_grad()
-        outputs = model(images, input_id_report, attention_mask_report)
+        outputs = model(images, input_id_report, attention_mask_report,)
         loss = criterion(outputs, labels)
+        loss_history.append(loss.detach().numpy())
+        update_png(loss_history, "brainclip")
         loss.backward()
         optimizer.step()
 
-        i += 1
-        
-        if (i+1) % 100 == 0:
-            print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch+1, num_epochs, i+1, total_step, loss.item()))
 
+torch.save(model.state_dict(), "/datadrive_m2/alice/brain-CLIP/brainclip/model/experiments/brainclip.pt")

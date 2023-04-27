@@ -1,3 +1,4 @@
+from transformers import DistilBertModel
 import torch
 import torch.nn as nn
 from torchvision.models.video import r3d_18
@@ -7,20 +8,20 @@ import torch
 from torch.utils.data import DataLoader
 from brainclip.model.utils.file_utils import load_dataset
 
-class ImageEncoder(nn.Module):
-    def __init__(self, embedding_size=200):
-        super(ImageEncoder, self).__init__()
-        self.embedding_size=embedding_size 
-        self.resnet3d_output_size = 400 # number of classes for kinetics400
-        self.resnet3d = r3d_18(weights='KINETICS400_V1')
-        self.embedding_layer = nn.Linear(in_features=self.resnet3d_output_size, out_features=self.embedding_size)
+class TextEncoder(nn.Module):
+    def __init__(self, embedding_size=400):
+        super(TextEncoder, self).__init__()
+        self.distilbert = DistilBertModel.from_pretrained('distilbert-base-uncased')
+        self.distilbert.requires_grad_(False) # freeze all bert layers
+        self.embedding_layer = nn.Linear(in_features=768, out_features=3)
 
-    def forward(self, x):
-        x = self.resnet3d(x)
-        x = self.embedding_layer(x)
+    def forward(self, input_id_report, attention_mask_report):
+        outputs = self.distilbert(input_id_report.squeeze(0), attention_mask_report)
+        last_hidden_state = outputs.last_hidden_state
+        CLS_token_state = last_hidden_state[:, 0, :]
+        x = self.embedding_layer(CLS_token_state)
         return x
     
-
 
 class BrainCLIPDataset(torch.utils.data.Dataset):
     def __init__(self, split_type):
@@ -31,10 +32,10 @@ class BrainCLIPDataset(torch.utils.data.Dataset):
     
     def __getitem__(self, index):
         image, input_id_report, attention_mask_report, label = self.data[index]
-        return image, label
+        return input_id_report, attention_mask_report, label
 
 class BrainCLIPDataLoader:
-    def __init__(self, split_type, batch_size=5):
+    def __init__(self, split_type, batch_size=1):
         self.split_type = split_type
         self.batch_size = batch_size
         self.train_dataset = BrainCLIPDataset(self.split_type)
@@ -46,7 +47,7 @@ class BrainCLIPDataLoader:
 
 
 
-model = ImageEncoder()
+model = TextEncoder()
 criterion = nn.CrossEntropyLoss()
 optimizer = Adam(model.parameters(), lr=0.001)
 
@@ -56,14 +57,12 @@ num_epochs = 50
 loss_history = []
 
 for epoch in range(num_epochs):
-    for images, labels in train_loader:
+    for input_id_report, attention_mask_report, labels in train_loader:
         optimizer.zero_grad()
-        outputs = model(images)
+        outputs = model(input_id_report, attention_mask_report)
         loss = criterion(outputs, labels)
         loss_history.append(loss.detach().numpy())
-        update_png(loss_history)
+        print(loss)
+        update_png(loss_history, prefix="text")
         loss.backward()
         optimizer.step()
-
-
-

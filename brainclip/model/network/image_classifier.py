@@ -1,4 +1,3 @@
-from transformers import DistilBertModel
 import torch
 import torch.nn as nn
 from torchvision.models.video import r3d_18
@@ -8,19 +7,24 @@ import torch
 from torch.utils.data import DataLoader
 from brainclip.model.utils.file_utils import load_dataset
 
-class TextEncoder(nn.Module):
-    def __init__(self, embedding_size=400):
-        super(TextEncoder, self).__init__()
-        self.distilbert = DistilBertModel.from_pretrained('distilbert-base-uncased')
-        self.embedding_layer = nn.Linear(in_features=768, out_features=embedding_size)
+class ImageEncoder(nn.Module):
+    def __init__(self, embedding_size=200):
+        super(ImageEncoder, self).__init__()
+        self.embedding_size=embedding_size 
+        self.num_classes = 3 
+        self.resnet3d_output_size = 400 # number of classes for kinetics400
+        self.resnet3d = r3d_18(weights='KINETICS400_V1')
+        self.embedding_layer = nn.Linear(
+            in_features=self.resnet3d_output_size,
+            out_features=self.num_classes # change to self.embedding_size
+            )
 
-    def forward(self, input_id_report, attention_mask_report):
-        outputs = self.distilbert(input_ids=input_id_report, attention_mask=attention_mask_report)
-        last_hidden_state = outputs.last_hidden_state
-        CLS_token_state = last_hidden_state[:, 0, :]
-        x = self.embedding_layer(CLS_token_state)
+    def forward(self, x):
+        x = self.resnet3d(x)
+        x = self.embedding_layer(x)
         return x
     
+
 
 class BrainCLIPDataset(torch.utils.data.Dataset):
     def __init__(self, split_type):
@@ -31,7 +35,7 @@ class BrainCLIPDataset(torch.utils.data.Dataset):
     
     def __getitem__(self, index):
         image, input_id_report, attention_mask_report, label = self.data[index]
-        return input_id_report, attention_mask_report, label
+        return image, label
 
 class BrainCLIPDataLoader:
     def __init__(self, split_type, batch_size=5):
@@ -46,7 +50,7 @@ class BrainCLIPDataLoader:
 
 
 
-model = TextEncoder()
+model = ImageEncoder()
 criterion = nn.CrossEntropyLoss()
 optimizer = Adam(model.parameters(), lr=0.001)
 
@@ -56,12 +60,14 @@ num_epochs = 50
 loss_history = []
 
 for epoch in range(num_epochs):
-    for input_id_report, attention_mask_report, labels in train_loader:
+    for images, labels in train_loader:
         optimizer.zero_grad()
-        outputs = model(input_id_report, attention_mask_report)
+        outputs = model(images)
         loss = criterion(outputs, labels)
         loss_history.append(loss.detach().numpy())
-        print(loss)
         update_png(loss_history)
         loss.backward()
         optimizer.step()
+
+
+torch.save(model.state_dict(), "/datadrive_m2/alice/brain-CLIP/brainclip/model/experiments/image_encoder.pt")
