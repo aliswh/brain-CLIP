@@ -25,8 +25,8 @@ class TextEncoder(nn.Module):
     def forward(self, input_id_report, attention_mask_report):
         outputs = self.distilbert(input_ids=input_id_report, attention_mask=attention_mask_report)
         last_hidden_state = outputs.last_hidden_state
-        pooled_output = outputs.pooler_output
-        x = self.embedding_layer(pooled_output)
+        CLS_token_state = last_hidden_state[:, 0, :]
+        x = self.embedding_layer(CLS_token_state)
         return x
 
 # Define the CLIP model architecture

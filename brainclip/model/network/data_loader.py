@@ -11,10 +11,11 @@ class BrainCLIPDataset(torch.utils.data.Dataset):
     
     def __getitem__(self, index):
         image, input_id_report, attention_mask_report, label = self.data[index]
+        print(image.size(), input_id_report.size(), attention_mask_report.size(), label.size())
         return image, input_id_report, attention_mask_report, label
 
 class BrainCLIPDataLoader:
-    def __init__(self, split_type, batch_size=2):
+    def __init__(self, split_type, batch_size=1):
         self.split_type = split_type
         self.batch_size = batch_size
         self.train_dataset = BrainCLIPDataset(self.split_type)

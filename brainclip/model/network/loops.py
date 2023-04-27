@@ -9,6 +9,7 @@ num_epochs = 1
 image_encoder, text_encoder = ImageEncoder(), TextEncoder()
 model = BrainCLIP(image_encoder, text_encoder, num_classes=3)
 
+
 learning_rate = 0.001
 images_dir, reports_path = "", ""
 train_loader = BrainCLIPDataLoader("train")

@@ -4,9 +4,14 @@ import torch
 import nibabel as nib
 import torch.nn.functional as F
 from transformers import DistilBertTokenizer
+import matplotlib.pyplot as plt
+
+def update_png(loss_history):
+    plt.plot(range(len(loss_history)), loss_history)
+    plt.savefig("/datadrive_m2/alice/brain-CLIP/brainclip/model/network/loss.png")
 
 def pad_tensor(t):
-    max_len = 480 # found empirically
+    max_len = 480 # TODO
     t = F.pad(t, (0, max_len - t.size(0)), mode='constant', value=0)
     return t
 
@@ -20,7 +25,7 @@ def tokenize(text):
 
 def one_hot_encoding(labels):
     al = len(labels)
-    encoding = F.one_hot(torch.arange(0, 5)% 3, num_classes=al)
+    encoding = F.one_hot(torch.arange(0, 5)% 3, num_classes=al).float()
     return {l:e for l,e in zip(labels,encoding)}
 
 
@@ -52,6 +57,5 @@ def load_dataset(split_type):
 
         dataset[int(key)] = (image, input_id_report, attention_mask_report, label)
 
-    
     return dataset
 
