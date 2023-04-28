@@ -94,6 +94,6 @@ model =load_BrainCLIP(device,"/datadrive_m2/alice/brain-CLIP/brainclip/model/exp
 
 find_matches(model, 
              device,
-             query="Acute infarct",
-             n=3
+             query="no infarct",
+             n=5
              )

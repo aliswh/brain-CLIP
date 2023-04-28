@@ -16,7 +16,7 @@ model = BrainCLIP(image_encoder, text_encoder, num_classes=3).to(device) # infar
 learning_rate = 0.001
 optimizer = Adam(model.parameters(), lr=learning_rate)
 
-num_epochs = 3
+num_epochs = 200
 loss_history = []
 
 for epoch in range(num_epochs):
