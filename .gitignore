@@ -1,9 +1,13 @@
 # ignore data
-*.pt
 *.nii.gz
 *.nii
 *.npy
 *.model
+
+# Ignore PyTorch model files
+*.pt
+*.pth
+*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

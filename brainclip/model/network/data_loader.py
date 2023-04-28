@@ -10,9 +10,8 @@ class BrainCLIPDataset(torch.utils.data.Dataset):
         return len(self.data)
     
     def __getitem__(self, index):
-        image, input_id_report, attention_mask_report, label = self.data[index]
-        print(image.size(), input_id_report.size(), attention_mask_report.size(), label.size())
-        return image, input_id_report, attention_mask_report, label
+        image, input_id_report, attention_mask_report, label, image_path = self.data[index]
+        return image, input_id_report, attention_mask_report, label, image_path
 
 class BrainCLIPDataLoader:
     def __init__(self, split_type, batch_size=1):

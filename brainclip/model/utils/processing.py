@@ -4,6 +4,10 @@ Image and text processing functions.
 
 import nibabel as nib
 import numpy as np
+from transformers import DistilBertTokenizer
+import torch.nn.functional as F
+import torch
+
 
 def crop_image(img_path):
     """Crop image to pretrained r3d_18 input format."""
@@ -30,3 +34,14 @@ def crop_image(img_path):
 
 def preprocess_image(img_path):
     crop_image(img_path)
+
+
+def tokenize(text_batch):
+    tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+    encoded_batch = tokenizer(text_batch, padding="max_length", return_tensors='pt')
+    return encoded_batch
+
+def one_hot_encoding(labels):
+    al = len(labels)
+    encoding = F.one_hot(torch.arange(0, 5)% 3, num_classes=al).float()
+    return {l:e for l,e in zip(labels,encoding)}

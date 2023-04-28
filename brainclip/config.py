@@ -8,4 +8,7 @@ parsed_reports = raw_text+"parsed_reports.csv"
 train_data = data_folder+"train/"
 valid_data = data_folder+"valid/"
 test_data = data_folder+"test/"
-
+# trained model path
+model_folder = "/datadrive_m2/alice/brain-CLIP/brainclip/model/"
+experiments_folder = model_folder+"experiments/"
+final_model = "brainclip_final.pt"

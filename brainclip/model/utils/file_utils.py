@@ -1,24 +1,24 @@
 from brainclip.config import *
+from brainclip.model.network.brain_CLIP_model import ImageEncoder, TextEncoder, BrainCLIP
+from brainclip.model.utils.processing import tokenize, one_hot_encoding
 import os, json
 import torch
 import nibabel as nib
-import torch.nn.functional as F
-from transformers import DistilBertTokenizer
 import matplotlib.pyplot as plt
+
+def get_device():
+    return 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def update_png(loss_history, prefix=""):
     plt.plot(range(len(loss_history)), loss_history)
     plt.savefig(f"/datadrive_m2/alice/brain-CLIP/brainclip/model/network/{prefix}_loss.png")
 
-def tokenize(text_batch):
-    tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-    encoded_batch = tokenizer(text_batch, padding="max_length", return_tensors='pt')
-    return encoded_batch
-
-def one_hot_encoding(labels):
-    al = len(labels)
-    encoding = F.one_hot(torch.arange(0, 5)% 3, num_classes=al).float()
-    return {l:e for l,e in zip(labels,encoding)}
+def load_BrainCLIP(device, model_path):
+    image_encoder, text_encoder = ImageEncoder(), TextEncoder()
+    model = BrainCLIP(image_encoder, text_encoder, num_classes=3).to(device) # infarct, normal, others
+    
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    return model.eval()
 
 
 def load_dataset(split_type):
@@ -51,14 +51,14 @@ def load_dataset(split_type):
 
         label = one_hot[label]
 
-        dataset[key] = [image, None, label]
+        dataset[key] = [image, None, label, value["name"] ] # return also image path
 
     # tokenize batch of documents
     tokenized_batch = tokenize(report_batch[1])
     
     for idx, key in enumerate(report_batch[0]):
         tokenized_report = [tokenized_batch[d][idx] for d in ["input_ids","attention_mask"]]
-        dataset[key] = (dataset[key][0], *tokenized_report, dataset[key][2])
+        dataset[key] = (dataset[key][0], *tokenized_report, dataset[key][2], dataset[key][3])
 
     return dataset
 
