@@ -55,6 +55,7 @@ class ProjectionHead(nn.Module):
         dropout=0.2
     ):
         super().__init__()
+        self.projection_dim = projection_dim
         self.projection = nn.Linear(embedding_dim, projection_dim)
         self.gelu = nn.GELU()
         self.fc = nn.Linear(projection_dim, projection_dim)
@@ -81,7 +82,7 @@ class BrainCLIP(nn.Module):
         self.text_projection = ProjectionHead(embedding_dim=self.text_encoder.embedding_size)
         self.temperature = 1.0 # no difference
         # classification
-        self.fc = nn.Linear(self.image_projection.projection.projection_dim + self.text_projection.projection.projection_dim, num_classes)
+        self.fc = nn.Linear(self.image_projection.projection_dim + self.text_projection.projection_dim, num_classes)
 
     def contrastive_loss(self, text_embeddings, image_embeddings):
         logits = (text_embeddings @ image_embeddings.T) / self.temperature
@@ -95,24 +96,26 @@ class BrainCLIP(nn.Module):
         loss =  (images_loss + texts_loss) / 2.0 # shape: (batch_size)
         return loss.mean()
 
-    def classification_loss(self, image_embeddings, text_embeddings, label):
-        embeddings = torch.cat((image_embeddings, text_embeddings), dim=1)
-        cls_output =  self.fc(embeddings)
+    def classification_loss(self, cls_output, label):
         ce_loss = nn.CrossEntropyLoss()
         return ce_loss(cls_output, label)
 
-    def combined_loss(cls_loss, ctrs_loss):
+    def combined_loss(self, cls_loss, ctrs_loss):
         return cls_loss + ctrs_loss
 
     def forward(self, image, input_id_report, attention_mask_report, label):
         image_embedding = self.image_encoder(image)
         text_embedding = self.text_encoder(input_id_report, attention_mask_report)
 
+        # contrastive
         image_embeddings = self.image_projection(image_embedding)
         text_embeddings = self.text_projection(text_embedding)
+        # classification
+        cat_embeddings = torch.cat((image_embeddings, text_embeddings), dim=1)
+        cls_output =  self.fc(cat_embeddings)
 
         # Calculating the Loss
-        cls_loss = self.classification_loss(image_embeddings, text_embeddings, label)
+        cls_loss = self.classification_loss(cls_output, label)
         ctrs_loss = self.contrastive_loss(image_embeddings, text_embeddings)
         return self.combined_loss(cls_loss, ctrs_loss)
 
