@@ -20,7 +20,7 @@ loss_history = []
 for epoch in range(num_epochs):
     for images, input_id_report, attention_mask_report, labels, _ in train_loader:
         optimizer.zero_grad()
-        loss = model(images, input_id_report, attention_mask_report,)
+        loss = model(images, input_id_report, attention_mask_report, labels)
         loss_history.append(loss.detach().numpy())
         update_png(loss_history, "brainclip")
         loss.backward()

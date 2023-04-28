@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from transformers import DistilBertModel
 from torchvision.models.video import r3d_18
@@ -75,18 +76,14 @@ class BrainCLIP(nn.Module):
         super(BrainCLIP, self).__init__()
         self.image_encoder = image_encoder
         self.text_encoder = text_encoder
+        self.num_classes = num_classes
         self.image_projection = ProjectionHead(embedding_dim=self.image_encoder.embedding_size)
         self.text_projection = ProjectionHead(embedding_dim=self.text_encoder.embedding_size)
         self.temperature = 1.0 # no difference
+        # classification
+        self.fc = nn.Linear(self.image_projection.projection.projection_dim + self.text_projection.projection.projection_dim, num_classes)
 
-    def forward(self, image, input_id_report, attention_mask_report):
-        image_embedding = self.image_encoder(image)
-        text_embedding = self.text_encoder(input_id_report, attention_mask_report)
-
-        image_embeddings = self.image_projection(image_embedding)
-        text_embeddings = self.text_projection(text_embedding)
-
-        # Calculating the Loss
+    def contrastive_loss(self, text_embeddings, image_embeddings):
         logits = (text_embeddings @ image_embeddings.T) / self.temperature
         images_similarity = image_embeddings @ image_embeddings.T
         texts_similarity = text_embeddings @ text_embeddings.T
@@ -98,4 +95,24 @@ class BrainCLIP(nn.Module):
         loss =  (images_loss + texts_loss) / 2.0 # shape: (batch_size)
         return loss.mean()
 
+    def classification_loss(self, image_embeddings, text_embeddings, label):
+        embeddings = torch.cat((image_embeddings, text_embeddings), dim=1)
+        cls_output =  self.fc(embeddings)
+        ce_loss = nn.CrossEntropyLoss()
+        return ce_loss(cls_output, label)
+
+    def combined_loss(cls_loss, ctrs_loss):
+        return cls_loss + ctrs_loss
+
+    def forward(self, image, input_id_report, attention_mask_report, label):
+        image_embedding = self.image_encoder(image)
+        text_embedding = self.text_encoder(input_id_report, attention_mask_report)
+
+        image_embeddings = self.image_projection(image_embedding)
+        text_embeddings = self.text_projection(text_embedding)
+
+        # Calculating the Loss
+        cls_loss = self.classification_loss(image_embeddings, text_embeddings, label)
+        ctrs_loss = self.contrastive_loss(image_embeddings, text_embeddings)
+        return self.combined_loss(cls_loss, ctrs_loss)
 
