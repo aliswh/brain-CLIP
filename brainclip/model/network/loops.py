@@ -16,7 +16,7 @@ model = BrainCLIP(image_encoder, text_encoder).to(device) # infarct, normal, oth
 learning_rate = 0.001
 optimizer = Adam(model.parameters(), lr=learning_rate)
 
-num_epochs = 300
+num_epochs = 200
 train_losses = []
 
 for epoch in range(num_epochs):
@@ -39,6 +39,9 @@ for epoch in range(num_epochs):
     # log epoch loss and update plot
     epoch_loss /= len(train_loader)
     train_losses.append(epoch_loss)
+
+    print(f"Epoch {epoch + 1} loss: {epoch_loss:.4f}")
+
     update_png(train_losses, "brainclip")   
 
     

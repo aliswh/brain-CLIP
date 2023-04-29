@@ -5,6 +5,8 @@ from brainclip.model.utils.file_utils import get_device, load_BrainCLIP
 from brainclip.model.network.data_loader import BrainCLIPDataLoader
 from brainclip.model.utils.processing import tokenize
 import torch.nn.functional as F
+from brainclip.model.network.brain_CLIP_model import BrainCLIPClassifier, ImageEncoder, TextEncoder, BrainCLIP
+
 
 
 def get_image_embeddings(model, device):
@@ -57,8 +59,8 @@ def get_embeddings(model, device, query):
     return torch.cat(valid_image_embeddings), torch.cat(valid_text_embeddings), valid_image_paths, valid_true_class
 
 def get_class_prediction(image_embeddings, text_embeddings):
-    cat_embedding = torch.cat((image_embeddings, text_embeddings.repeat(5,1)), dim=1)
-    cls_pred = model.fc(cat_embedding)
+    cat_embedding = torch.cat((image_embeddings, text_embeddings.repeat(10,1)), dim=1)
+    cls_pred = brainclip_model.fc(cat_embedding)
     return cls_pred.cpu()
 
 def correct_prediction(ground_truth, predictions):
@@ -71,29 +73,27 @@ def find_matches(model, device, query, n=5):
     image_embeddings, image_filenames, ground_truth = get_image_embeddings(model, device)
     text_embeddings = get_text_embeddings(model, device, query)
     
-    cls_pred = get_class_prediction(image_embeddings, text_embeddings)
+    #cls_pred = get_class_prediction(image_embeddings, text_embeddings)
 
     image_embeddings_n = F.normalize(image_embeddings, p=2, dim=-1)
     text_embeddings_n = F.normalize(text_embeddings, p=2, dim=-1)
     dot_similarity = text_embeddings_n @ image_embeddings_n.T
     
-    # multiplying by 5 to consider that there are 5 captions for a single image
-    # so in indices, the first 5 indices point to a single image, the second 5 indices
-    # to another one and so on.
-    values, indices = torch.topk(dot_similarity.squeeze(0), n * 1)
-    matches = [image_filenames[idx] for idx in indices[::5]]
+    values, indices = torch.topk(dot_similarity.squeeze(0), n)
+    matches = [image_filenames[idx] for idx in indices]
     
     """Plot matches function""" # TODO
 
     print(values, indices, matches)
-    print(correct_prediction(ground_truth, cls_pred))
+    #print(correct_prediction(ground_truth, cls_pred))
 
 
 device = get_device()
-model =load_BrainCLIP(device,"/datadrive_m2/alice/brain-CLIP/brainclip/model/experiments/brainclip_class_final.pt")
+brainclip_model = BrainCLIP(ImageEncoder(), TextEncoder()).to(device) # infarct, normal, others
+brainclip_model = load_BrainCLIP(device, final_model_path, brainclip_model)
 
-find_matches(model, 
+find_matches(brainclip_model, 
              device,
-             query="no infarct",
-             n=5
+             query="tumor",
+             n=3
              )

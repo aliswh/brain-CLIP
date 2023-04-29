@@ -12,9 +12,9 @@ device = get_device()
 brainclip_model = BrainCLIP(ImageEncoder(), TextEncoder()).to(device) # infarct, normal, others
 brainclip_model = load_BrainCLIP(device, final_model_path, brainclip_model)
 
-model = BrainCLIPClassifier(brainclip_model, 3, inference=True).to(device)
+model = BrainCLIPClassifier(brainclip_model, 5, inference=True).to(device)
 
-test_loader = BrainCLIPDataLoader("valid", batch_size=1)
+test_loader = BrainCLIPDataLoader("valid", batch_size=2)
 
 predictions = []
 ground_truth = []

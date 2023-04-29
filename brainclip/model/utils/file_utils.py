@@ -26,7 +26,8 @@ def load_dataset(split_type):
 
 
     dataset = {}
-    one_hot = one_hot_encoding(['infarct', 'normal', 'others'])
+    #one_hot = one_hot_encoding(['infarct', 'normal', 'others'])
+    one_hot = one_hot_encoding(['infarct', 'tumor', 'hemorrhage', 'normal', 'others'])
     json_path = os.path.join(data_folder, f"{split_type}.json")
 
     with open(json_path, "r") as f: 

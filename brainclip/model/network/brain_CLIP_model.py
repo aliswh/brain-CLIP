@@ -9,10 +9,17 @@ class ImageEncoder(nn.Module):
     def __init__(self, embedding_size=400):
         super(ImageEncoder, self).__init__()
         self.embedding_size=embedding_size 
-        self.num_classes = 3 
+
         self.resnet3d_output_size = 400 # number of classes for kinetics400
         self.resnet3d = r3d_18(weights='KINETICS400_V1')
-        self.resnet3d.requires_grad_(False)
+        
+        # freeze all layers except last one - Linear Probing
+        for param in self.resnet3d.parameters():
+            param.requires_grad_(False)
+
+        for param in self.resnet3d.layer4.parameters():
+            param.requires_grad_(True)
+
         self.embedding_layer = nn.Linear(
             in_features=self.resnet3d_output_size,
             out_features=self.embedding_size
@@ -28,9 +35,10 @@ class TextEncoder(nn.Module):
     def __init__(self, embedding_size=400):
         super(TextEncoder, self).__init__()
         self.embedding_size=embedding_size
+        self.distilbert_output_size = 768
         self.distilbert = DistilBertModel.from_pretrained('distilbert-base-uncased')
         self.distilbert.requires_grad_(False) # freeze all bert layers
-        self.embedding_layer = nn.Linear(in_features=768, out_features=embedding_size)
+        self.embedding_layer = nn.Linear(in_features=self.distilbert_output_size, out_features=embedding_size)
 
     def forward(self, input_id_report, attention_mask_report):
         outputs = self.distilbert(input_id_report.squeeze(0), attention_mask_report)
@@ -71,7 +79,7 @@ class BrainCLIP(nn.Module):
         self.text_encoder = text_encoder
         self.image_projection = ProjectionHead(embedding_dim=self.image_encoder.embedding_size)
         self.text_projection = ProjectionHead(embedding_dim=self.text_encoder.embedding_size)
-        self.temperature = 1.0 # no difference
+        self.temperature = 0.2 # no difference
 
     def cross_entropy(self, preds, targets, reduction='none'):
         log_softmax = nn.LogSoftmax(dim=-1)
