@@ -8,29 +8,42 @@ import torch
 
 device = get_device()
 
-train_loader = BrainCLIPDataLoader("train", batch_size=5)
+train_loader = BrainCLIPDataLoader("train", batch_size=2)
 
 image_encoder, text_encoder = ImageEncoder(), TextEncoder()
-model = BrainCLIP(image_encoder, text_encoder, num_classes=3).to(device) # infarct, normal, others
+model = BrainCLIP(image_encoder, text_encoder).to(device) # infarct, normal, others
 
 learning_rate = 0.001
 optimizer = Adam(model.parameters(), lr=learning_rate)
 
-num_epochs = 200
-loss_history = []
+num_epochs = 300
+train_losses = []
 
 for epoch in range(num_epochs):
-    for images, input_id_report, attention_mask_report, labels, _ in train_loader:
-        data = [d.to(device) for d in [images, input_id_report, attention_mask_report, labels]]
+    epoch_loss = 0.0
+    for batch_idx, (images, input_id_report, attention_mask_report, _, _) in enumerate(train_loader):
+        # move data to device
+        images, input_id_report, attention_mask_report = images.to(device), input_id_report.to(device), attention_mask_report.to(device)
+
+        # zero the gradients
         optimizer.zero_grad()
-        loss = model(*data)
-        loss_history.append(loss.detach().cpu().numpy())
-        update_png(loss_history, "brainclip")
+
+        # forward pass and compute loss
+        loss = model(images, input_id_report, attention_mask_report)
+        epoch_loss += loss.item()
+
+        # backward pass and optimize
         loss.backward()
         optimizer.step()
+
+    # log epoch loss and update plot
+    epoch_loss /= len(train_loader)
+    train_losses.append(epoch_loss)
+    update_png(train_losses, "brainclip")   
+
     
     if epoch % 100 == 0:
-        torch.save(model.state_dict(), f"/datadrive_m2/alice/brain-CLIP/brainclip/model/experiments/brainclip_class_epoch_{epoch}.pt")
+        torch.save(model.state_dict(), f"{experiments_folder}brainclip_epoch_{epoch}.pt")
 
-
-torch.save(model.state_dict(), "/datadrive_m2/alice/brain-CLIP/brainclip/model/experiments/brainclip_class_final.pt")
+print("Training complete.") 
+torch.save(model.state_dict(), f"{experiments_folder}brainclip_final.pt")

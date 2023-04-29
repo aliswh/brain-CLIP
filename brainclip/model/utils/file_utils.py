@@ -1,5 +1,4 @@
 from brainclip.config import *
-from brainclip.model.network.brain_CLIP_model import ImageEncoder, TextEncoder, BrainCLIP
 from brainclip.model.utils.processing import tokenize, one_hot_encoding
 import os, json
 import torch
@@ -10,15 +9,12 @@ def get_device():
     return 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def update_png(loss_history, prefix=""):
-    plt.plot(range(len(loss_history)), loss_history)
-    plt.savefig(f"/datadrive_m2/alice/brain-CLIP/brainclip/model/network/{prefix}_loss.png")
+    plt.plot(range(len(loss_history)), loss_history, color='darkgreen')
+    plt.savefig(f"{experiments_folder}{prefix}_loss.png")
 
-def load_BrainCLIP(device, model_path):
-    image_encoder, text_encoder = ImageEncoder(), TextEncoder()
-    model = BrainCLIP(image_encoder, text_encoder, num_classes=3).to(device) # infarct, normal, others
-    
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    return model.eval()
+def load_BrainCLIP(device, model_path, brainclip_network):
+    brainclip_network.load_state_dict(torch.load(model_path, map_location=device))
+    return brainclip_network.eval()
 
 
 def load_dataset(split_type):

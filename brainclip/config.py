@@ -11,4 +11,4 @@ test_data = data_folder+"test/"
 # trained model path
 model_folder = "/datadrive_m2/alice/brain-CLIP/brainclip/model/"
 experiments_folder = model_folder+"experiments/"
-final_model = "brainclip_final.pt"
+final_model_path = experiments_folder+"brainclip_final.pt"

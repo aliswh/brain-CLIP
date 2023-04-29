@@ -17,9 +17,13 @@ class BrainCLIPDataLoader:
     def __init__(self, split_type, batch_size=1):
         self.split_type = split_type
         self.batch_size = batch_size
+        self.shuffle = True if split_type == "train" else False
         self.train_dataset = BrainCLIPDataset(self.split_type)
         
+    def __len__(self):
+        return len(self.train_dataset)
+
     def __iter__(self):
-        train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True)
+        train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=self.shuffle)
         return iter(train_loader)
 
