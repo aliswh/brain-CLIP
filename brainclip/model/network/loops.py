@@ -13,7 +13,7 @@ train_loader = BrainCLIPDataLoader("train", batch_size=2)
 image_encoder, text_encoder = ImageEncoder(), TextEncoder()
 model = BrainCLIP(image_encoder, text_encoder).to(device) # infarct, normal, others
 
-learning_rate = 0.001
+learning_rate = 0.00001
 optimizer = Adam(model.parameters(), lr=learning_rate)
 
 num_epochs = 200

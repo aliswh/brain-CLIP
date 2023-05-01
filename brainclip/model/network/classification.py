@@ -18,7 +18,7 @@ train_loader = BrainCLIPDataLoader("train", batch_size=5)
 learning_rate = 0.001
 optimizer = Adam(model.parameters(), lr=learning_rate)
 
-num_epochs = 200
+num_epochs = 50
 train_losses = []
 
 for epoch in range(num_epochs):

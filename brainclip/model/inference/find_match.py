@@ -94,6 +94,6 @@ brainclip_model = load_BrainCLIP(device, final_model_path, brainclip_model)
 
 find_matches(brainclip_model, 
              device,
-             query="tumor",
+             query="No significant abnormality is seen in the brain.",
              n=3
              )
