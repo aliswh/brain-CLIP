@@ -1,9 +1,10 @@
 from brainclip.config import *
-from brainclip.model.utils.processing import tokenize, one_hot_encoding
+from brainclip.model.utils.processing import tokenize, one_hot_encoding, preprocess_image, register_images
 import os, json
 import torch
 import nibabel as nib
 import matplotlib.pyplot as plt
+import SimpleITK as sitk
 
 def get_device():
     return 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -15,6 +16,17 @@ def update_png(loss_history, prefix=""):
 def load_BrainCLIP(device, model_path, brainclip_network):
     brainclip_network.load_state_dict(torch.load(model_path, map_location=device))
     return brainclip_network.eval()
+
+def concat_sequences(sequences_paths:list, target_path):
+    nii_list = []
+    for path in sequences_paths: 
+        nii_list.append( sitk.ReadImage(path) )
+    
+    nii_list = register_images(*nii_list)
+
+    concat_img = sitk.JoinSeries(nii_list)
+
+    sitk.WriteImage(concat_img, target_path)
 
 
 def load_dataset(split_type):
@@ -40,8 +52,11 @@ def load_dataset(split_type):
         image, report, label = value["name"], value["report"], value["label"]
 
         image = nib.load(image).get_fdata()
-        image = torch.Tensor(image)
-        image = torch.stack((image, image, image)) # TODO replace with 3 different sequences
+
+        # move modalities in first position as channels
+        image = torch.Tensor(image).permute(3, 0, 1, 2)
+
+        #image = torch.stack((image, image, image)) # TODO replace with 3 different sequences
 
         report_batch[0].append(key) 
         report_batch[1].append(report)
