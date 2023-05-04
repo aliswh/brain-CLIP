@@ -9,9 +9,28 @@ import SimpleITK as sitk
 def get_device():
     return 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def update_png(loss_history, prefix=""):
-    plt.plot(range(len(loss_history)), loss_history, color='darkgreen')
-    plt.savefig(f"{experiments_folder}{prefix}_loss.png")
+import matplotlib.pyplot as plt
+import os
+
+def update_png(loss_history, val_loss_history=None, prefix=""):
+    fig, ax = plt.subplots()
+    train_line, = ax.plot(range(len(loss_history)), loss_history, color='darkgreen')
+    if val_loss_history:
+        valid_line, = ax.plot(range(len(val_loss_history)), val_loss_history, color='lime')
+
+    handles, labels = [train_line], ['train loss']
+    if val_loss_history:
+        handles.append(valid_line)
+        labels.append('valid loss')
+
+    ax.legend(handles, labels)
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Loss')
+
+    plt.savefig(f"{experiments_folder}/{prefix}_loss.png")
+    plt.close(fig)
+
+    
 
 def load_BrainCLIP(device, model_path, brainclip_network):
     brainclip_network.load_state_dict(torch.load(model_path, map_location=device))

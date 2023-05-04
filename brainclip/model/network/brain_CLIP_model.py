@@ -15,7 +15,7 @@ class ImageEncoder(nn.Module):
         
         # freeze all layers except last one - Linear Probing
         for param in self.resnet3d.parameters():
-            param.requires_grad_(False)
+            param.requires_grad_(True)
 
         for param in self.resnet3d.layer4.parameters():
             param.requires_grad_(True)
@@ -79,7 +79,8 @@ class BrainCLIP(nn.Module):
         self.text_encoder = text_encoder
         self.image_projection = ProjectionHead(embedding_dim=self.image_encoder.embedding_size)
         self.text_projection = ProjectionHead(embedding_dim=self.text_encoder.embedding_size)
-        self.temperature = 0.2 # no difference
+        self.temperature = nn.Parameter(torch.tensor([0.5]), requires_grad=True)
+        self.parameter_list = nn.ParameterList([self.temperature])
 
     def cross_entropy(self, preds, targets, reduction='none'):
         log_softmax = nn.LogSoftmax(dim=-1)
@@ -110,7 +111,8 @@ class BrainCLIP(nn.Module):
 
         # Calculating the Loss
         ctrs_loss = self.contrastive_loss(image_embedding, text_embedding)
-        return ctrs_loss 
+        return ctrs_loss
+
 
 
 class BrainCLIPClassifier(nn.Module):

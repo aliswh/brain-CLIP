@@ -17,8 +17,6 @@ def crop_image(img):
 
     new_spacing = [sz*spc/nsz for sz, spc, nsz in zip(img.GetSize(), img.GetSpacing(), (112,112,16))]
 
-
-
     center = np.array(img_shape) / 2
     # Calculate the starting and ending point for the crop
     start = np.round(center - np.array([8, 56, 56])).astype(int)
@@ -46,7 +44,8 @@ def preprocess_image(img):
 
 def tokenize(text_batch):
     tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-    encoded_batch = tokenizer(text_batch, padding="max_length", return_tensors='pt')
+    # truncation and padding to model `max_length`input
+    encoded_batch = tokenizer(text_batch, padding="max_length", truncation=True, return_tensors='pt')
     return encoded_batch
 
 def one_hot_encoding(labels):

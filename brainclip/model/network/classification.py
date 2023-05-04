@@ -13,35 +13,45 @@ brainclip_model = load_BrainCLIP(device, final_model_path, brainclip_model)
 
 model = BrainCLIPClassifier(brainclip_model, 5).to(device)
 
-train_loader = BrainCLIPDataLoader("train", batch_size=5)
+train_loader = BrainCLIPDataLoader("train", batch_size=2)
+val_loader = BrainCLIPDataLoader("valid", batch_size=2)
+
 
 learning_rate = 0.001
 optimizer = Adam(model.parameters(), lr=learning_rate)
 
-num_epochs = 50
+num_epochs = 100
 train_losses = []
+val_losses = []
 
 for epoch in range(num_epochs):
     epoch_loss = 0.0
     for batch_idx, (images, input_id_report, attention_mask_report, label, _) in enumerate(train_loader):
-        # move data to device
         images, input_id_report, attention_mask_report, label = images.to(device), input_id_report.to(device), attention_mask_report.to(device), label.to(device)
         optimizer.zero_grad()
 
         loss = model(images, input_id_report, attention_mask_report, label)
         epoch_loss += loss.item()
 
-        # backward pass and optimize
         loss.backward()
         optimizer.step()
 
-    # log epoch loss and update plot
     epoch_loss /= len(train_loader)
     train_losses.append(epoch_loss)
 
-    print(f"Epoch {epoch + 1} loss: {epoch_loss:.4f}")
+    with torch.no_grad():
+        val_loss = 0.0
+        for batch_idx, (images, input_id_report, attention_mask_report, label, _) in enumerate(val_loader):
+            images, input_id_report, attention_mask_report, label = images.to(device), input_id_report.to(device), attention_mask_report.to(device), label.to(device)
+            loss = model(images, input_id_report, attention_mask_report, label)
+            val_loss += loss.item()
 
-    update_png(train_losses, "brainclip_cls_")  
+        val_loss /= len(val_loader)
+        val_losses.append(val_loss)
+    
+    print(f"Epoch {epoch + 1} loss: {epoch_loss:.4f}, val_loss: {val_loss:.4f}") 
+    
+    update_png(train_losses, val_losses, "brainclip_cls")
     
     if epoch % 100 == 0:
         torch.save(model.state_dict(), f"/datadrive_m2/alice/brain-CLIP/brainclip/model/experiments/brainclip_class_epoch_{epoch}.pt")
