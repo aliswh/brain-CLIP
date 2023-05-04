@@ -1,16 +1,20 @@
 import torch
 from torch.utils.data import DataLoader
 from brainclip.model.utils.file_utils import load_dataset
+from brainclip.model.utils.transforms import apply_transform, get_transforms
 
 class BrainCLIPDataset(torch.utils.data.Dataset):
     def __init__(self, split_type):
+        self.split_type = split_type
         self.data = load_dataset(split_type)
+        self.transforms = get_transforms()
     
     def __len__(self):
         return len(self.data)
     
     def __getitem__(self, index):
         image, input_id_report, attention_mask_report, label, image_path = self.data[index]
+        if self.split_type=="train": image = apply_transform(image, self.transforms)
         return image, input_id_report, attention_mask_report, label, image_path
 
 class BrainCLIPDataLoader:
