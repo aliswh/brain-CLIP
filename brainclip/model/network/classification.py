@@ -1,7 +1,6 @@
 from brainclip.config import *
 from brainclip.model.utils.file_utils import update_png, get_device, load_BrainCLIP
 from brainclip.model.network.brain_CLIP_model import BrainCLIPClassifier, ImageEncoder, TextEncoder, BrainCLIP
-
 from brainclip.model.network.data_loader import BrainCLIPDataLoader
 from torch.optim import Adam
 import torch
@@ -13,14 +12,14 @@ brainclip_model = load_BrainCLIP(device, final_model_path, brainclip_model)
 
 model = BrainCLIPClassifier(brainclip_model, 5).to(device)
 
-train_loader = BrainCLIPDataLoader("train", batch_size=2)
-val_loader = BrainCLIPDataLoader("valid", batch_size=2)
+train_loader = BrainCLIPDataLoader("train", batch_size=3)
+val_loader = BrainCLIPDataLoader("valid", batch_size=3)
 
 
 learning_rate = 0.001
 optimizer = Adam(model.parameters(), lr=learning_rate)
 
-num_epochs = 100
+num_epochs = 15
 train_losses = []
 val_losses = []
 

@@ -5,21 +5,24 @@ from brainclip.model.network.data_loader import BrainCLIPDataLoader
 import torch.nn as nn
 from torch.optim import Adam
 import torch
+from torch.optim.lr_scheduler import MultiStepLR
 
 device = get_device()
 
-train_loader = BrainCLIPDataLoader("train", batch_size=3)
-val_loader = BrainCLIPDataLoader("valid", batch_size=3)
+train_loader = BrainCLIPDataLoader("train", batch_size=64)
+val_loader = BrainCLIPDataLoader("valid", batch_size=64)
 
 image_encoder, text_encoder = ImageEncoder(), TextEncoder()
 model = BrainCLIP(image_encoder, text_encoder).to(device) # infarct, normal, others
 
-learning_rate = 0.0001
-optimizer = Adam(model.parameters(), lr=learning_rate)
-
-num_epochs = 500
+num_epochs = 200
 train_losses = []
 val_losses = []
+
+optimizer = Adam(model.parameters(), lr=0.01)
+scheduler = MultiStepLR(optimizer, 
+                        milestones=[50], # List of epoch indices
+                        gamma = 0.5) # Multiplicative factor of learning rate decay
 
 for epoch in range(num_epochs):
     epoch_loss = 0.0
@@ -32,6 +35,8 @@ for epoch in range(num_epochs):
 
         loss.backward()
         optimizer.step()
+
+    scheduler.step()
 
     epoch_loss /= len(train_loader)
     train_losses.append(epoch_loss)
@@ -46,7 +51,7 @@ for epoch in range(num_epochs):
         val_loss /= len(val_loader)
         val_losses.append(val_loss)
     
-    print(f"Epoch {epoch + 1} loss: {epoch_loss:.4f}, val_loss: {val_loss:.4f}, temperature: {model.temperature.item():.4f}") 
+    print(f"Epoch {epoch + 1} loss: {epoch_loss:.4f}, val_loss: {val_loss:.4f}, temperature: {model.temperature:.4f}, lr: {optimizer.param_groups[0]['lr']}") 
     
     update_png(train_losses, val_losses, "brainclip")
 

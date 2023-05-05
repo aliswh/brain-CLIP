@@ -27,6 +27,8 @@ def update_png(loss_history, val_loss_history=None, prefix=""):
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Loss')
 
+    ax.set_ylim([0, 0.5])
+
     plt.savefig(f"{experiments_folder}/{prefix}_loss.png")
     plt.close(fig)
 
@@ -57,8 +59,8 @@ def load_dataset(split_type):
 
 
     dataset = {}
-    #one_hot = one_hot_encoding(['infarct', 'normal', 'others'])
-    one_hot = one_hot_encoding(['infarct', 'tumor', 'hemorrhage', 'normal', 'others'])
+    one_hot = one_hot_encoding(['infarct', 'normal'])
+    #one_hot = one_hot_encoding(['infarct', 'tumor', 'hemorrhage', 'normal', 'others'])
     json_path = os.path.join(data_folder, f"{split_type}.json")
 
     with open(json_path, "r") as f: 

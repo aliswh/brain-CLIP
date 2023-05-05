@@ -50,7 +50,8 @@ def tokenize(text_batch):
 
 def one_hot_encoding(labels):
     al = len(labels)
-    encoding = F.one_hot(torch.arange(0, 5)% 3, num_classes=al).float()
+    if al == 2: encoding = [torch.Tensor([1.]), torch.Tensor([0.])]
+    else: encoding = F.one_hot(torch.arange(0, al), num_classes=al).float()
     return {l:e for l,e in zip(labels,encoding)}
 
 
