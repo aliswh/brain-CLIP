@@ -57,7 +57,7 @@ optimizer = Adam(model.parameters(), lr=0.001)
 train_loader = BrainCLIPDataLoader("train", batch_size=16)
 val_loader = BrainCLIPDataLoader("valid", batch_size=16)
 
-num_epochs = 100
+num_epochs = 50
 train_losses = []
 val_losses = []
 
