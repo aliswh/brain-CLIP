@@ -24,8 +24,7 @@ for images, input_id_report, attention_mask_report, labels, _ in test_loader:
         output = model(*data)
         predictions.append(output.argmax(dim=1).cpu().numpy())
         ground_truth.append(labels.argmax(dim=1).cpu().numpy())
-        #predictions.append(output.cpu().numpy())
-        #ground_truth.append(labels.cpu().numpy())
+
 
 predictions = np.concatenate(predictions).flatten()
 ground_truth = np.concatenate(ground_truth).flatten()

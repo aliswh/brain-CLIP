@@ -12,75 +12,25 @@ class ImageEncoder(nn.Module):
 
         self.resnet3d_output_size = 400 # number of classes for kinetics400
         self.resnet3d = r3d_18(weights='KINETICS400_V1')
+        
+        # Use last layer (512 features) for embedding
         num_ftrs = self.resnet3d.fc.in_features
         self.resnet3d.fc = nn.Linear(num_ftrs, self.embedding_size)
         
-        # freeze all layers except last one - Linear Probing
         for param in self.resnet3d.parameters():
             param.requires_grad_(True)
+        # freeze all layers except last one - Linear Probing
         for param in self.resnet3d.fc.parameters():
             param.requires_grad_(True)   
 
-        #for param in self.resnet3d.layer4.parameters():
-        #    param.requires_grad_(True)
-
         self.embedding_layer = self.resnet3d.fc
-        #self.embedding_layer = nn.Linear(
-        #    in_features=self.resnet3d_output_size,
-        #    out_features=self.embedding_size
-        #    )
+
 
     def forward(self, x):
         x = self.resnet3d(x)
         x = self.embedding_layer(x)
         return x
     
-class AAAImageEncoder(nn.Module):
-    def __init__(self, embedding_size=4096):
-        super(ImageEncoder, self).__init__()
-        self.embedding_size=embedding_size
-
-        self.conv1 = nn.Conv3d(3, 64, kernel_size=7, stride=1, padding=1)
-        self.bn1 = nn.BatchNorm3d(64)
-        self.relu1 = nn.ReLU(inplace=True)
-
-        self.conv2 = nn.Conv3d(64, 128, kernel_size=5, stride=2, padding=1)
-        self.bn2 = nn.BatchNorm3d(128)
-        self.relu2 = nn.ReLU(inplace=True)
-
-        self.conv3 = nn.Conv3d(128, 256, kernel_size=3, stride=2, padding=1)
-        self.bn3 = nn.BatchNorm3d(256)
-        self.relu3 = nn.ReLU(inplace=True)
-
-        self.conv4 = nn.Conv3d(256, 512, kernel_size=3, stride=2, padding=1)
-        self.bn4 = nn.BatchNorm3d(512)
-        self.relu4 = nn.ReLU(inplace=True)
-
-        self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
-        self.embedding_layer = nn.Linear(512, self.embedding_size)
-
-    def forward(self, x): # x == image
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu1(x)
-
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.relu2(x)
-
-        x = self.conv3(x)
-        x = self.bn3(x)
-        x = self.relu3(x)
-
-        x = self.conv4(x)
-        x = self.bn4(x)
-        x = self.relu4(x)
-
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.embedding_layer(x)
-
-        return x
 
 
 # Define the text encoder using the pretrained DistilBERT
@@ -228,9 +178,9 @@ class BrainCLIPClassifier(nn.Module):
         x = nn.functional.relu(x)
         x = self.pool(x)
         x = x.view(-1, 8 * 98)
-
         logits = self.fc(x)
-        softmax = self.softmax(logits)
+
+        softmax = self.softmax(x)
         
         if self.inference: return softmax
         else: return self.classification_loss(logits, label)

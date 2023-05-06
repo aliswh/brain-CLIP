@@ -6,6 +6,8 @@ from brainclip.model.utils.file_utils import update_png, get_device
 import torch
 from brainclip.model.network.data_loader import BrainCLIPDataLoader
 import numpy as np
+from torch.optim.lr_scheduler import MultiStepLR
+
 
 class ImageEncoder(nn.Module):
     def __init__(self, num_classes, embedding_size=400):
@@ -31,8 +33,7 @@ class ImageEncoder(nn.Module):
         self.sigmoid = nn.Sigmoid()
         
     def ce_loss(self, output, label):
-        if self.num_classes == 1: loss = nn.BCELoss()
-        else: loss = nn.CrossEntropyLoss()
+        loss = nn.CrossEntropyLoss()
         return loss(output, label)
 
     def forward(self, x, label):
@@ -50,13 +51,13 @@ class ImageEncoder(nn.Module):
 
 
 device = get_device()
-model = ImageEncoder(1).to(device) # 1 if binary
+model = ImageEncoder(2).to(device) # 1 if binary
 optimizer = Adam(model.parameters(), lr=0.001)
 
-train_loader = BrainCLIPDataLoader("train", batch_size=10)
-val_loader = BrainCLIPDataLoader("valid", batch_size=10)
+train_loader = BrainCLIPDataLoader("train", batch_size=16)
+val_loader = BrainCLIPDataLoader("valid", batch_size=16)
 
-num_epochs = 20
+num_epochs = 100
 train_losses = []
 val_losses = []
 
@@ -71,6 +72,7 @@ for epoch in range(num_epochs):
 
         loss.backward()
         optimizer.step()
+    
 
     epoch_loss /= len(train_loader)
     train_losses.append(epoch_loss)
@@ -78,7 +80,7 @@ for epoch in range(num_epochs):
     with torch.no_grad():
         val_loss = 0.0
         for batch_idx, (images, input_id_report, attention_mask_report, label, _) in enumerate(val_loader):
-            images, label = images.to(device),  label.to(device)
+            images, label = images.to(device), label.to(device)
             loss = model(images, label)
             val_loss += loss.item()
 
@@ -102,8 +104,8 @@ for batch_idx, (images, input_id_report, attention_mask_report, labels, _) in en
     images = images.to(device)
     with torch.no_grad():
         output = model.inference(images)
-        predictions.append(torch.round(output).cpu().numpy())
-        ground_truth.append(labels)
+        predictions.append(output.argmax(dim=1).cpu().numpy())
+        ground_truth.append(labels.argmax(dim=1).cpu().numpy())
 
 predictions = np.concatenate(predictions)
 ground_truth = np.concatenate(ground_truth)
