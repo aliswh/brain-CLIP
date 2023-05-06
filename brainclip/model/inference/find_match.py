@@ -84,7 +84,7 @@ print("\n\n\n")
 
 find_matches(brainclip_model, 
              device,
-             query="Normal",
+             query="Infarct",
              n=3
              )
 

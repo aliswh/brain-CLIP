@@ -17,7 +17,7 @@ class ImageEncoder(nn.Module):
         
         # freeze all layers except last one - Linear Probing
         for param in self.resnet3d.parameters():
-            param.requires_grad_(False)
+            param.requires_grad_(True)
         for param in self.resnet3d.fc.parameters():
             param.requires_grad_(True)   
 
@@ -137,9 +137,9 @@ class BrainCLIP(nn.Module):
         self.text_projection = ProjectionHead(
             embedding_dim=self.text_encoder.embedding_size,
             projection_dim=self.text_encoder.embedding_size)
-        #self.temperature = nn.Parameter(torch.tensor([0.07]), requires_grad=True) # 0.07 in paper
-        #self.parameter_list = nn.ParameterList([self.temperature])
-        self.temperature = 1
+        self.temperature = nn.Parameter(torch.tensor([0.07]), requires_grad=True) # 0.07 in paper
+        self.parameter_list = nn.ParameterList([self.temperature])
+        #self.temperature = 1 #0.07
 
     def cross_entropy(self, preds, targets, reduction='none'):
         log_softmax = nn.LogSoftmax(dim=-1)
@@ -157,9 +157,11 @@ class BrainCLIP(nn.Module):
         targets = F.softmax(
             (images_similarity + texts_similarity) / 2 * self.temperature, dim=-1
         )
+
         texts_loss = self.cross_entropy(logits, targets, reduction='none')
         images_loss = self.cross_entropy(logits.T, targets.T, reduction='none')
-        loss =  (images_loss + texts_loss) / 2.0 # shape: (batch_size)
+
+        loss =  (images_loss*0.9 + texts_loss*0.1) / 2.0 # shape: (batch_size)
         return loss.mean()
 
     def forward(self, image, input_id_report, attention_mask_report):
@@ -176,8 +178,6 @@ class BrainCLIP(nn.Module):
         #text_embedding = F.pad(text_embedding, (max_size - text_embedding.size(1), 0, 0, 0), value=0)
 
         # L2 normalization
-        image_embedding = F.normalize(image_embedding, p=2, dim=1)
-        text_embedding = F.normalize(text_embedding, p=2, dim=1)
 
         # Calculating the Loss
         ctrs_loss = self.contrastive_loss(image_embedding, text_embedding)
@@ -205,16 +205,12 @@ class BrainCLIPClassifier(nn.Module):
         self.conv = nn.Conv1d(2, 8, kernel_size=5)
         self.pool = nn.MaxPool1d(kernel_size=2)
         self.fc = nn.Linear(8 * 98, num_classes)
-
-    def correct_prediction(self, ground_truth, predictions):
-        predictions = [torch.argmax(p) for p in predictions]
-        ground_truth = [torch.argmax(p) for p in ground_truth]
-        return [(gt==p).item() for gt,p in zip(ground_truth,predictions)]
+        self.softmax = nn.Softmax(dim=0)
 
 
     def classification_loss(self, cls_output, label):
-        ce_loss = nn.CrossEntropyLoss()
-        return ce_loss(cls_output, label)
+        loss = nn.CrossEntropyLoss()
+        return loss(cls_output, label)
 
     def forward(self, image, input_id_report, attention_mask_report, label):
         # extract features
@@ -234,8 +230,7 @@ class BrainCLIPClassifier(nn.Module):
         x = x.view(-1, 8 * 98)
 
         logits = self.fc(x)
-        softmax = nn.functional.softmax(logits, dim=1)
-        cls_loss = self.classification_loss(logits, label)
-
+        softmax = self.softmax(logits)
+        
         if self.inference: return softmax
-        else: return cls_loss
+        else: return self.classification_loss(logits, label)

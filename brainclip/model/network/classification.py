@@ -10,13 +10,13 @@ device = get_device()
 brainclip_model = BrainCLIP(ImageEncoder(), TextEncoder()).to(device) # infarct, normal, others
 brainclip_model = load_BrainCLIP(device, final_model_path, brainclip_model)
 
-model = BrainCLIPClassifier(brainclip_model, 5).to(device)
+model = BrainCLIPClassifier(brainclip_model, 2).to(device)
 
 train_loader = BrainCLIPDataLoader("train", batch_size=3)
 val_loader = BrainCLIPDataLoader("valid", batch_size=3)
 
 
-learning_rate = 0.001
+learning_rate = 0.01
 optimizer = Adam(model.parameters(), lr=learning_rate)
 
 num_epochs = 15
