@@ -87,7 +87,7 @@ for epoch in range(num_epochs):
 
 
 # ---- inference
-
+model.eval()
 test_loader = BrainCLIPDataLoader("test", batch_size=3)
 
 predictions = []

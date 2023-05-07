@@ -15,7 +15,7 @@ val_loader = BrainCLIPDataLoader("valid", batch_size=2)
 image_encoder, text_encoder = ImageEncoder(), TextEncoder()
 model = BrainCLIP(image_encoder, text_encoder).to(device) # infarct, normal, others
 
-num_epochs = 500
+num_epochs = 1000
 train_losses = []
 val_losses = []
 

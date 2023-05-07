@@ -51,7 +51,7 @@ class ImageEncoder(nn.Module):
 
 
 device = get_device()
-model = ImageEncoder(2).to(device) # 1 if binary
+model = ImageEncoder(2).to(device)
 optimizer = Adam(model.parameters(), lr=0.001)
 
 train_loader = BrainCLIPDataLoader("train", batch_size=16)
@@ -95,7 +95,7 @@ for epoch in range(num_epochs):
 
 
 # ---- inference
-
+model.eval()
 test_loader = BrainCLIPDataLoader("test", batch_size=3)
 
 predictions = []

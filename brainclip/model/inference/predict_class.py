@@ -1,5 +1,5 @@
 from brainclip.config import *
-from brainclip.model.utils.file_utils import update_png, get_device, load_BrainCLIP
+from brainclip.model.utils.file_utils import update_png, get_device, load_model
 from brainclip.model.network.brain_CLIP_model import BrainCLIPClassifier, ImageEncoder, TextEncoder, BrainCLIP
 
 from brainclip.model.network.data_loader import BrainCLIPDataLoader
@@ -10,11 +10,10 @@ import numpy as np
 device = get_device()
 
 brainclip_model = BrainCLIP(ImageEncoder(), TextEncoder()).to(device) 
-brainclip_model = load_BrainCLIP(device, final_model_path, brainclip_model)
-
 model = BrainCLIPClassifier(brainclip_model, 2, inference=True).to(device)
+model = load_model(device, classification_model_path, model, inference=True)
 
-test_loader = BrainCLIPDataLoader("test", batch_size=3)
+test_loader = BrainCLIPDataLoader("test", batch_size=2)
 
 predictions = []
 ground_truth = []

@@ -34,9 +34,10 @@ def update_png(loss_history, val_loss_history=None, prefix=""):
 
     
 
-def load_BrainCLIP(device, model_path, brainclip_network):
-    brainclip_network.load_state_dict(torch.load(model_path, map_location=device))
-    return brainclip_network.eval()
+def load_model(device, model_path, network, inference=False):
+    network.load_state_dict(torch.load(model_path, map_location=device))
+    if inference: return network.eval()
+    else: return network
 
 def concat_sequences(sequences_paths:list, target_path):
     nii_list = []

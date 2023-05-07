@@ -121,14 +121,6 @@ class BrainCLIP(nn.Module):
         image_embedding = self.image_projection(image_embedding)
         text_embedding = self.text_projection(text_embedding)
 
-        #print(image_embedding.size(), text_embedding.size())
-
-        # pad text_embedding to match image_embedding
-        #max_size = max(text_embedding.size(1), image_embedding.size(1))
-        #text_embedding = F.pad(text_embedding, (max_size - text_embedding.size(1), 0, 0, 0), value=0)
-
-        # L2 normalization
-
         # Calculating the Loss
         ctrs_loss = self.contrastive_loss(image_embedding, text_embedding)
         return ctrs_loss
@@ -148,14 +140,20 @@ class BrainCLIPClassifier(nn.Module):
         self.model = brainclip_model
         self.image_encoder = self.model.image_encoder
         self.text_encoder = self.model.text_encoder
-        self.image_projection = ProjectionHead(embedding_dim=self.image_encoder.embedding_size)
-        self.text_projection = ProjectionHead(embedding_dim=self.text_encoder.embedding_size)
+        self.image_projection = ProjectionHead(
+            embedding_dim=self.image_encoder.embedding_size,
+            projection_dim=self.image_encoder.embedding_size)
+        self.text_projection = ProjectionHead(
+            embedding_dim=self.text_encoder.embedding_size,
+            projection_dim=self.text_encoder.embedding_size)
         
         # classification nn
         self.conv = nn.Conv1d(2, 8, kernel_size=5)
+        self.relu = nn.ReLU()
         self.pool = nn.MaxPool1d(kernel_size=2)
-        self.fc = nn.Linear(8 * 98, num_classes)
-        self.softmax = nn.Softmax(dim=0)
+        self.flatten = nn.Flatten() 
+        self.fc = nn.Linear(2032, self.num_classes)
+        self.softmax = nn.Softmax(dim=1)
 
 
     def classification_loss(self, cls_output, label):
@@ -175,12 +173,58 @@ class BrainCLIPClassifier(nn.Module):
 
         # classification
         x = self.conv(features)
-        x = nn.functional.relu(x)
+        x = self.relu(x)
         x = self.pool(x)
-        x = x.view(-1, 8 * 98)
-        logits = self.fc(x)
-
-        softmax = self.softmax(x)
+        x = self.flatten(x)
+        x = self.fc(x)
+        logits = self.softmax(x)
         
-        if self.inference: return softmax
+        if self.inference: return logits
+        else: return self.classification_loss(logits, label)
+
+
+
+class BrainCLIPClassifier(nn.Module):
+    def __init__(self, brainclip_model, num_classes, inference=False):
+        super(BrainCLIPClassifier, self).__init__()
+        self.num_classes = num_classes
+
+        # brainCLIP
+        self.inference = inference
+        self.model = brainclip_model
+        self.image_encoder = self.model.image_encoder
+        self.image_projection = ProjectionHead(
+            embedding_dim=self.image_encoder.embedding_size,
+            projection_dim=self.image_encoder.embedding_size)
+        
+        # classification nn
+        n_nodes = self.image_encoder.embedding_size
+        self.fc1 = nn.Linear(n_nodes, 400)
+        self.relu1 = nn.ReLU()
+        self.fc2 = nn.Linear(400, 200)
+        self.relu2 = nn.ReLU()
+        self.fc3 = nn.Linear(200, num_classes)
+        self.relu3 = nn.ReLU()
+        self.softmax = nn.Softmax(dim=1)
+
+
+    def classification_loss(self, cls_output, label):
+        loss = nn.CrossEntropyLoss()
+        return loss(cls_output, label)
+
+    def forward(self, image, input_id_report, attention_mask_report, label):
+        # extract features
+        image_embedding = self.image_encoder(image)
+        image_embedding = self.image_projection(image_embedding)        
+
+        # classification
+        x = self.fc1(image_embedding)
+        x = self.relu1(x)
+        x = self.fc2(x)
+        x = self.relu2(x)
+        x = self.fc3(x)
+        x = self.relu3(x)
+        logits = self.softmax(x)
+        
+        if self.inference: return logits
         else: return self.classification_loss(logits, label)
