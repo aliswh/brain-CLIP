@@ -1,5 +1,5 @@
 from brainclip.config import *
-from brainclip.model.utils.file_utils import update_png, get_device, load_BrainCLIP
+from brainclip.model.utils.file_utils import update_png, get_device, load_model
 from brainclip.model.network.brain_CLIP_model import ImageEncoder, TextEncoder, BrainCLIP
 from brainclip.model.network.data_loader import BrainCLIPDataLoader
 import torch.nn as nn
@@ -9,13 +9,13 @@ from torch.optim.lr_scheduler import MultiStepLR
 
 device = get_device()
 
-train_loader = BrainCLIPDataLoader("train", batch_size=2)
-val_loader = BrainCLIPDataLoader("valid", batch_size=2)
+train_loader = BrainCLIPDataLoader("train", batch_size=16)
+val_loader = BrainCLIPDataLoader("valid", batch_size=16)
 
 image_encoder, text_encoder = ImageEncoder(), TextEncoder()
 model = BrainCLIP(image_encoder, text_encoder).to(device) # infarct, normal, others
 
-num_epochs = 1000
+num_epochs = 200
 train_losses = []
 val_losses = []
 
@@ -67,7 +67,7 @@ for epoch in range(num_epochs):
         val_loss /= len(val_loader)
         val_losses.append(val_loss)
     
-    print(f"Epoch {epoch + 1} loss: {epoch_loss:.4f}, val_loss: {val_loss:.4f}, temperature: {model.temperature.item():.4f}, lr: {optimizer.param_groups[0]['lr']}") 
+    print(f"Epoch {epoch + 1} loss: {epoch_loss:.4f}, val_loss: {val_loss:.4f}, temperature: {model.temperature.item():.4f}, loss_weight: {model.loss_weight.item():.4f}, lr: {optimizer.param_groups[0]['lr']}") 
     
     update_png(train_losses, val_losses, "brainclip")
 

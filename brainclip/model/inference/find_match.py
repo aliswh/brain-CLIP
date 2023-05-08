@@ -1,7 +1,7 @@
 from brainclip.config import *
 import torch
 from transformers import DistilBertTokenizer
-from brainclip.model.utils.file_utils import get_device, load_BrainCLIP
+from brainclip.model.utils.file_utils import get_device
 from brainclip.model.network.data_loader import BrainCLIPDataLoader
 from brainclip.model.utils.processing import tokenize
 import torch.nn.functional as F
@@ -67,7 +67,7 @@ def find_matches(model, device, query, n=5):
     dot_similarity = text_embeddings_n @ image_embeddings_n.T
     
     values, indices = torch.topk(dot_similarity.squeeze(0), n)
-    matches = [f"{torch.argmax(ground_truth[idx])} {image_filenames[idx]}:\t{valid_reports[idx]}\n" for idx in indices]
+    matches = [f"{torch.argmax(ground_truth[idx])} {image_filenames[idx]}:\n{valid_reports[idx]}\n" for idx in indices]
     
     """Plot matches function""" # TODO
 
@@ -77,27 +77,19 @@ def find_matches(model, device, query, n=5):
 
 device = get_device()
 brainclip_model = BrainCLIP(ImageEncoder(), TextEncoder()).to(device) # infarct, normal, others
-brainclip_model = load_BrainCLIP(device, final_model_path, brainclip_model)
-
+loaded_model = torch.load(final_model_path, map_location=device)
+brainclip_model.load_state_dict(loaded_model)
 
 print("\n\n\n")
 
 find_matches(brainclip_model, 
              device,
              query="Infarct",
-             n=3
-             )
-
-print("\n\n\n")
-
-find_matches(brainclip_model, 
-             device,
-             query="No significant abnormality is seen in the brain.",
-             n=1
+             n=5
              )
 
 find_matches(brainclip_model, 
              device,
-             query="hdakjfkjalkfjsa sjflkalkfs",
-             n=3
+             query="No abnormality",
+             n=5
              )

@@ -9,9 +9,10 @@ import numpy as np
 
 device = get_device()
 
-brainclip_model = BrainCLIP(ImageEncoder(), TextEncoder()).to(device) 
-model = BrainCLIPClassifier(brainclip_model, 2, inference=True).to(device)
-model = load_model(device, classification_model_path, model, inference=True)
+model = BrainCLIPClassifier(ImageEncoder(), TextEncoder(), 2, inference=True).to(device)
+loaded_model = torch.load(classification_model_path, map_location=device)
+model.load_state_dict(loaded_model, strict=False)
+model.eval()
 
 test_loader = BrainCLIPDataLoader("test", batch_size=2)
 

@@ -88,7 +88,8 @@ class BrainCLIP(nn.Module):
             embedding_dim=self.text_encoder.embedding_size,
             projection_dim=self.text_encoder.embedding_size)
         self.temperature = nn.Parameter(torch.tensor([0.07]), requires_grad=True) # 0.07 in paper
-        self.parameter_list = nn.ParameterList([self.temperature])
+        self.loss_weight = nn.Parameter(torch.tensor([0.5]), requires_grad=True)
+        self.parameter_list = nn.ParameterList([self.temperature, self.loss_weight])
         #self.temperature = 1 #0.07
 
     def cross_entropy(self, preds, targets, reduction='none'):
@@ -111,7 +112,7 @@ class BrainCLIP(nn.Module):
         texts_loss = self.cross_entropy(logits, targets, reduction='none')
         images_loss = self.cross_entropy(logits.T, targets.T, reduction='none')
 
-        loss =  (images_loss*0.9 + texts_loss*0.1) / 2.0 # shape: (batch_size)
+        loss = (self.loss_weight*images_loss + (1-self.loss_weight)*texts_loss) / logits.size(0) # shape: (batch_size)
         return loss.mean()
 
     def forward(self, image, input_id_report, attention_mask_report):
@@ -125,7 +126,7 @@ class BrainCLIP(nn.Module):
         ctrs_loss = self.contrastive_loss(image_embedding, text_embedding)
         return ctrs_loss
 
-
+"""
 
 
 
@@ -138,8 +139,10 @@ class BrainCLIPClassifier(nn.Module):
         # brainCLIP
         self.inference = inference
         self.model = brainclip_model
+
         self.image_encoder = self.model.image_encoder
         self.text_encoder = self.model.text_encoder
+
         self.image_projection = ProjectionHead(
             embedding_dim=self.image_encoder.embedding_size,
             projection_dim=self.image_encoder.embedding_size)
@@ -182,34 +185,28 @@ class BrainCLIPClassifier(nn.Module):
         if self.inference: return logits
         else: return self.classification_loss(logits, label)
 
+"""
 
-
-class BrainCLIPClassifier(nn.Module):
-    def __init__(self, brainclip_model, num_classes, inference=False):
-        super(BrainCLIPClassifier, self).__init__()
+class BrainCLIPClassifier(BrainCLIP):
+    def __init__(self, image_encoder, text_encoder, num_classes, inference=False):
+        super().__init__(image_encoder, text_encoder)
         self.num_classes = num_classes
+        self.inference=inference
 
-        # brainCLIP
-        self.inference = inference
-        self.model = brainclip_model
-        self.image_encoder = self.model.image_encoder
-        self.image_projection = ProjectionHead(
-            embedding_dim=self.image_encoder.embedding_size,
-            projection_dim=self.image_encoder.embedding_size)
-        
         # classification nn
         n_nodes = self.image_encoder.embedding_size
-        self.fc1 = nn.Linear(n_nodes, 400)
-        self.relu1 = nn.ReLU()
-        self.fc2 = nn.Linear(400, 200)
-        self.relu2 = nn.ReLU()
-        self.fc3 = nn.Linear(200, num_classes)
-        self.relu3 = nn.ReLU()
-        self.softmax = nn.Softmax(dim=1)
+        self.braincls_fc1 = nn.Linear(n_nodes, 2) # 400
+        #with torch.no_grad(): self.braincls_fc1.weight.copy_(torch.Tensor([0.5]))
+        #self.braincls_relu1 = nn.ReLU()
+        #self.braincls_fc2 = nn.Linear(400, 200)
+        #self.braincls_relu2 = nn.ReLU()
+        #self.braincls_fc3 = nn.Linear(200, num_classes)
+        #self.braincls_relu3 = nn.ReLU()
+        self.braincls_softmax = nn.Softmax(dim=1)
 
 
     def classification_loss(self, cls_output, label):
-        loss = nn.CrossEntropyLoss()
+        loss = nn.BCELoss()
         return loss(cls_output, label)
 
     def forward(self, image, input_id_report, attention_mask_report, label):
@@ -218,13 +215,18 @@ class BrainCLIPClassifier(nn.Module):
         image_embedding = self.image_projection(image_embedding)        
 
         # classification
-        x = self.fc1(image_embedding)
-        x = self.relu1(x)
-        x = self.fc2(x)
-        x = self.relu2(x)
-        x = self.fc3(x)
-        x = self.relu3(x)
-        logits = self.softmax(x)
+        x = self.braincls_fc1(image_embedding)
+        #x = self.braincls_relu1(x)
+        #x = self.braincls_fc2(x)
+        #x = self.braincls_relu2(x)
+        #x = self.braincls_fc3(x)
+        #x = self.braincls_relu3(x)
+        logits = self.braincls_softmax(x)
         
-        if self.inference: return logits
+        if self.inference: 
+            return logits
         else: return self.classification_loss(logits, label)
+
+
+
+

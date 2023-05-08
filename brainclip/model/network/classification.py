@@ -6,25 +6,37 @@ from torch.optim import Adam, SGD
 import torch
 from torch.optim.lr_scheduler import MultiStepLR
 
-
 device = get_device()
 
-brainclip_model = BrainCLIP(ImageEncoder(), TextEncoder()).to(device) # infarct, normal, others
-brainclip_model = load_model(device, final_model_path, brainclip_model)
+model = BrainCLIPClassifier(ImageEncoder(), TextEncoder(), 2).to(device)
+loaded_model = torch.load(final_model_path, map_location=device)
+model.load_state_dict(loaded_model, strict=False)
+for name, param in model.named_parameters():
+    if any([p for p in param if p is None]): print(name)
+    if not name.startswith("braincls_"): param.requires_grad = False
 
-model = BrainCLIPClassifier(brainclip_model, 2).to(device)
 
-train_loader = BrainCLIPDataLoader("train", batch_size=3)
-val_loader = BrainCLIPDataLoader("valid", batch_size=3)
+"""
+for n,p in model.named_parameters():
+    if n.endswith('weight'):
+        if p.grad is None:
+            print('===========\ngradient:{}\n{}'.format(n,p.grad))
+        else:
+            print(f"***** {n} OK")
+"""
+
+train_loader = BrainCLIPDataLoader("train", batch_size=16)
+val_loader = BrainCLIPDataLoader("valid", batch_size=16)
 
 
-learning_rate = 0.00001
-optimizer = SGD(model.parameters(), lr=learning_rate)
+
+learning_rate = 0.001
+optimizer = Adam(model.parameters(), lr=learning_rate)
 scheduler = MultiStepLR(optimizer, 
                         milestones=[10,15,20,30,40,50,60,70], 
                         gamma = 0.1) 
 
-num_epochs = 300
+num_epochs = 50
 train_losses = []
 val_losses = []
 
@@ -63,3 +75,6 @@ for epoch in range(num_epochs):
 
 
 torch.save(model.state_dict(), classification_model_path)
+
+
+
