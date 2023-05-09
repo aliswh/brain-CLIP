@@ -54,7 +54,7 @@ class ProjectionHead(nn.Module):
     def __init__(
         self,
         embedding_dim,
-        projection_dim=200,
+        projection_dim=300,
         dropout=0.2
     ):
         super().__init__()
@@ -63,15 +63,15 @@ class ProjectionHead(nn.Module):
 
         self.projection = nn.Linear(self.embedding_dim, self.projection_dim)
         self.relu = nn.ReLU()
-        #self.bnorm = nn.BatchNorm1d(num_features=3)
+        self.fc = nn.Linear(self.projection_dim, self.projection_dim)
         self.dropout = nn.Dropout(dropout)
         self.layer_norm = nn.LayerNorm(self.projection_dim)
     
     def forward(self, x):
         projected = self.projection(x)
         x = self.relu(projected)
-        #x = self.bnorm(x)
         x = self.dropout(x)
+        x = x + projected
         x = self.layer_norm(x)
         return x
 
@@ -82,11 +82,9 @@ class BrainCLIP(nn.Module):
         self.image_encoder = image_encoder
         self.text_encoder = text_encoder
         self.image_projection = ProjectionHead(
-            embedding_dim=self.image_encoder.embedding_size,
-            projection_dim=self.image_encoder.embedding_size)
+            embedding_dim=self.image_encoder.embedding_size)
         self.text_projection = ProjectionHead(
-            embedding_dim=self.text_encoder.embedding_size,
-            projection_dim=self.text_encoder.embedding_size)
+            embedding_dim=self.text_encoder.embedding_size)
         self.temperature = nn.Parameter(torch.tensor([0.07]), requires_grad=True) # 0.07 in paper
         self.loss_weight = nn.Parameter(torch.tensor([0.5]), requires_grad=True)
         self.parameter_list = nn.ParameterList([self.temperature, self.loss_weight])
@@ -101,6 +99,7 @@ class BrainCLIP(nn.Module):
             return loss.mean()
 
     def contrastive_loss(self, text_embeddings, image_embeddings):
+        clampled_loss_weight = torch.clamp(self.loss_weight, 0.5, 1)
         logits = (text_embeddings @ image_embeddings.T) / self.temperature
         images_similarity = image_embeddings @ image_embeddings.T
         texts_similarity = text_embeddings @ text_embeddings.T
@@ -112,7 +111,7 @@ class BrainCLIP(nn.Module):
         texts_loss = self.cross_entropy(logits, targets, reduction='none')
         images_loss = self.cross_entropy(logits.T, targets.T, reduction='none')
 
-        loss = (self.loss_weight*images_loss + (1-self.loss_weight)*texts_loss) / logits.size(0) # shape: (batch_size)
+        loss = (clampled_loss_weight*images_loss + (1-clampled_loss_weight)*texts_loss) / 2 # shape: (batch_size)
         return loss.mean()
 
     def forward(self, image, input_id_report, attention_mask_report):
@@ -194,7 +193,7 @@ class BrainCLIPClassifier(BrainCLIP):
         self.inference=inference
 
         # classification nn
-        n_nodes = self.image_encoder.embedding_size
+        n_nodes = self.image_projection.projection_dim
         self.braincls_fc1 = nn.Linear(n_nodes, 2) # 400
         #with torch.no_grad(): self.braincls_fc1.weight.copy_(torch.Tensor([0.5]))
         #self.braincls_relu1 = nn.ReLU()

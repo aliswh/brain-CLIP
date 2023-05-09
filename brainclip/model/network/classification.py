@@ -36,7 +36,7 @@ scheduler = MultiStepLR(optimizer,
                         milestones=[10,15,20,30,40,50,60,70], 
                         gamma = 0.1) 
 
-num_epochs = 50
+num_epochs = 10
 train_losses = []
 val_losses = []
 

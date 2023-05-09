@@ -47,11 +47,6 @@ def get_text_embeddings(model, device, query):
         text_embeddings = model.text_projection(text_features)
     return text_embeddings
 
-def get_class_prediction(image_embeddings, text_embeddings):
-    cat_embedding = torch.cat((image_embeddings, text_embeddings.repeat(10,1)), dim=1)
-    cls_pred = brainclip_model.fc(cat_embedding)
-    return cls_pred.cpu()
-
 def correct_prediction(ground_truth, predictions):
     predictions = [torch.argmax(p) for p in predictions]
     ground_truth = [torch.argmax(p) for p in ground_truth]
@@ -62,14 +57,16 @@ def find_matches(model, device, query, n=5):
     image_embeddings, image_filenames, ground_truth, valid_reports = get_image_embeddings(model, device)
     text_embeddings = get_text_embeddings(model, device, query)
     
-    image_embeddings_n = F.normalize(image_embeddings, p=2, dim=-1)
+    image_embeddings_n = F.normalize(image_embeddings, p=2, dim=-1) 
     text_embeddings_n = F.normalize(text_embeddings, p=2, dim=-1)
     dot_similarity = text_embeddings_n @ image_embeddings_n.T
-    
+
     values, indices = torch.topk(dot_similarity.squeeze(0), n)
+
     matches = [f"{torch.argmax(ground_truth[idx])} {image_filenames[idx]}:\n{valid_reports[idx]}\n" for idx in indices]
     
     """Plot matches function""" # TODO
+    torch.set_printoptions(precision=10)
 
     print(values, ''.join(matches), sep="\n")
     #print(correct_prediction(ground_truth, cls_pred))
@@ -79,6 +76,7 @@ device = get_device()
 brainclip_model = BrainCLIP(ImageEncoder(), TextEncoder()).to(device) # infarct, normal, others
 loaded_model = torch.load(final_model_path, map_location=device)
 brainclip_model.load_state_dict(loaded_model)
+brainclip_model.eval()
 
 print("\n\n\n")
 
@@ -90,6 +88,6 @@ find_matches(brainclip_model,
 
 find_matches(brainclip_model, 
              device,
-             query="No abnormality",
+             query="No significant abnormality",
              n=5
              )
