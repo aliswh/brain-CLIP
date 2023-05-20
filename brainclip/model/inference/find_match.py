@@ -72,6 +72,32 @@ def find_matches(model, device, query, n=5):
     #print(correct_prediction(ground_truth, cls_pred))
 
 
+def cosine_similarity(A, B):
+    A_norm = torch.nn.functional.normalize(A, dim=1)
+    B_norm = torch.nn.functional.normalize(B, dim=1)
+    similarity = A_norm @ B_norm.T
+    return similarity
+
+def find_matches(model, device, query, n=5):
+
+    image_embeddings, image_filenames, ground_truth, valid_reports = get_image_embeddings(model, device)
+    text_embeddings = get_text_embeddings(model, device, query)
+
+    similarity = cosine_similarity(image_embeddings, text_embeddings)
+    similarity = torch.squeeze(similarity)
+
+    values, indices = torch.topk(similarity, n)
+
+    matches = [f"{torch.argmax(ground_truth[idx])} {image_filenames[idx]}:\n{valid_reports[idx]}\n" for idx in indices]
+    
+    """Plot matches function""" # TODO
+    torch.set_printoptions(precision=10)
+
+    print(sorted(similarity.cpu().numpy())[::-1])
+    print(''.join(matches), sep="\n")
+    #print(correct_prediction(ground_truth, cls_pred))
+
+
 device = get_device()
 brainclip_model = BrainCLIP(ImageEncoder(), TextEncoder()).to(device) # infarct, normal, others
 loaded_model = torch.load(final_model_path, map_location=device)
@@ -82,12 +108,12 @@ print("\n\n\n")
 
 find_matches(brainclip_model, 
              device,
-             query="Infarct",
-             n=5
+             query="Chronic ischemic small vessel changes in bilateral periventricular fronto-parietal white matter (FAZEKAS grade - I). Multiple old lacunar infarcts in fronto-parietal white matter. No evidence of acute infarct, hemorrhage or space occupying mass lesion. Page 2 of 2",
+             n=3
              )
 
 find_matches(brainclip_model, 
              device,
-             query="No significant abnormality",
-             n=5
+             query="No significant abnormality is seen in the brain.",
+             n=3
              )

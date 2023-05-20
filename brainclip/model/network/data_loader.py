@@ -28,6 +28,6 @@ class BrainCLIPDataLoader:
         return len(self.train_dataset)
 
     def __iter__(self):
-        train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=self.shuffle)
+        train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=self.shuffle, drop_last=True)
         return iter(train_loader)
 

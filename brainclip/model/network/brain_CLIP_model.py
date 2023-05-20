@@ -3,6 +3,7 @@ import torch.nn as nn
 from transformers import DistilBertModel
 from torchvision.models.video import r3d_18
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 # Define the text encoder using the pretrained 3DResNet on Kinetic400 (r3d_18)
 class ImageEncoder(nn.Module):
@@ -89,6 +90,8 @@ class BrainCLIP(nn.Module):
         self.loss_weight = nn.Parameter(torch.tensor([0.5]), requires_grad=True)
         self.parameter_list = nn.ParameterList([self.temperature, self.loss_weight])
         #self.temperature = 1 #0.07
+        from brainclip.model.utils.file_utils import get_device
+        self.targets = torch.arange(512).to(get_device())
 
     def cross_entropy(self, preds, targets, reduction='none'):
         log_softmax = nn.LogSoftmax(dim=-1)
@@ -98,23 +101,84 @@ class BrainCLIP(nn.Module):
         elif reduction == "mean":
             return loss.mean()
 
-    def contrastive_loss(self, text_embeddings, image_embeddings):
+    def plot_similarity(self, similarity_matrix, label):
+        similarity_matrix = similarity_matrix.detach().cpu().numpy()
+        label = [torch.argmax(l).detach().cpu().numpy() for l in label]
+
+        plt.imshow(similarity_matrix, cmap='hot', interpolation='nearest', vmin=0, vmax=1)
+        plt.colorbar()
+        plt.title('Similarity Matrix')
+        plt.xlabel('Texts') 
+        plt.ylabel('Images')
+        plt.xticks(range(len(label)), label)
+        plt.yticks(range(len(label)), label)
+        plt.savefig("/datadrive_m2/alice/brain-CLIP/brainclip/model/experiments/sim.png")
+        plt.close()
+
+    def cosine_similarity(self, A, B):
         clampled_loss_weight = torch.clamp(self.loss_weight, 0.5, 1)
-        logits = (text_embeddings @ image_embeddings.T) / self.temperature
+
+        A_norm = torch.nn.functional.normalize(A, dim=1)
+        B_norm = torch.nn.functional.normalize(B, dim=1)
+
+        A_norm = clampled_loss_weight * A_norm
+        B_norm = (1-clampled_loss_weight) * B_norm
+
+        similarity = torch.matmul(A_norm, B_norm.T)
+        return similarity
+    
+    def cosine_similarity(self, A, B):
+        clampled_loss_weight = torch.clamp(self.loss_weight, 0.5, 1)
+
+        A_norm = torch.nn.functional.normalize(A, dim=1)
+        B_norm = torch.nn.functional.normalize(B, dim=1)
+
+        #A_norm = clampled_loss_weight * A_norm
+        #B_norm = (1-clampled_loss_weight) * B_norm
+
+        similarity = A_norm @ B_norm.T
+        return similarity
+
+
+    def contrastive_loss(self, text_embeddings, image_embeddings, label):
+        #clampled_loss_weight = torch.clamp(self.loss_weight, 0.5, 1)
+
+        #image_embeddings = F.normalize(image_embeddings, dim=-1)
+        #text_embeddings = F.normalize(text_embeddings, dim=-1)
+
+        #logits = (text_embeddings @ image_embeddings.T) / self.temperature
         images_similarity = image_embeddings @ image_embeddings.T
         texts_similarity = text_embeddings @ text_embeddings.T
+
+        similarity_matrix = self.cosine_similarity(images_similarity, texts_similarity)
+        #similarity_matrix = self.cosine_similarity(image_embeddings, text_embeddings)
+
+
+
+        batch_size = similarity_matrix.size(0)
+        mask = torch.eye(batch_size, dtype=torch.bool, device=similarity_matrix.device)
+        matching_loss = similarity_matrix[mask].mean()
+        non_matching_loss = similarity_matrix[~mask].mean()
+        loss = ((1-matching_loss) + non_matching_loss) / 2
+
+        print((1-matching_loss).detach().cpu().numpy(), non_matching_loss.detach().cpu().numpy())
+
+        self.plot_similarity(similarity_matrix, label)
         
-        targets = F.softmax(
-            (images_similarity + texts_similarity) / 2 * self.temperature, dim=-1
-        )
+        #self.targets = F.softmax(
+        #    (images_similarity + texts_similarity) / 2 * self.temperature, dim=-1
+        #)   
 
-        texts_loss = self.cross_entropy(logits, targets, reduction='none')
-        images_loss = self.cross_entropy(logits.T, targets.T, reduction='none')
+        #texts_loss = self.cross_entropy(logits, self.targets, reduction='none')
+        #images_loss = self.cross_entropy(logits.T, self.targets.T, reduction='none')
 
-        loss = (clampled_loss_weight*images_loss + (1-clampled_loss_weight)*texts_loss) / 2 # shape: (batch_size)
-        return loss.mean()
+        #loss = (clampled_loss_weight*images_loss + (1-clampled_loss_weight)*texts_loss) / 2 # shape: (batch_size)
+        #return loss.mean()
+        return loss
 
-    def forward(self, image, input_id_report, attention_mask_report):
+    
+
+    def forward(self, image, input_id_report, attention_mask_report, label):
         image_embedding = self.image_encoder(image)
         text_embedding = self.text_encoder(input_id_report, attention_mask_report)
 
@@ -122,7 +186,7 @@ class BrainCLIP(nn.Module):
         text_embedding = self.text_projection(text_embedding)
 
         # Calculating the Loss
-        ctrs_loss = self.contrastive_loss(image_embedding, text_embedding)
+        ctrs_loss = self.contrastive_loss(image_embedding, text_embedding, label)
         return ctrs_loss
 
 """
@@ -194,14 +258,14 @@ class BrainCLIPClassifier(BrainCLIP):
 
         # classification nn
         n_nodes = self.image_projection.projection_dim
-        self.braincls_fc1 = nn.Linear(n_nodes, 2) # 400
+        self.braincls_fc1 = nn.Linear(n_nodes, 200) # 400
         #with torch.no_grad(): self.braincls_fc1.weight.copy_(torch.Tensor([0.5]))
-        #self.braincls_relu1 = nn.ReLU()
+        self.braincls_relu1 = nn.LeakyReLU()
         #self.braincls_fc2 = nn.Linear(400, 200)
-        #self.braincls_relu2 = nn.ReLU()
-        #self.braincls_fc3 = nn.Linear(200, num_classes)
-        #self.braincls_relu3 = nn.ReLU()
-        self.braincls_softmax = nn.Softmax(dim=1)
+        #self.braincls_relu2 = nn.LeakyReLU()
+        self.braincls_fc3 = nn.Linear(200, num_classes)
+        self.braincls_relu3 = nn.LeakyReLU()
+        self.braincls_softmax = nn.Softmin(dim=1)
 
 
     def classification_loss(self, cls_output, label):
@@ -215,11 +279,11 @@ class BrainCLIPClassifier(BrainCLIP):
 
         # classification
         x = self.braincls_fc1(image_embedding)
-        #x = self.braincls_relu1(x)
+        x = self.braincls_relu1(x)
         #x = self.braincls_fc2(x)
         #x = self.braincls_relu2(x)
-        #x = self.braincls_fc3(x)
-        #x = self.braincls_relu3(x)
+        x = self.braincls_fc3(x)
+        x = self.braincls_relu3(x)
         logits = self.braincls_softmax(x)
         
         if self.inference: 

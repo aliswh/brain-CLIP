@@ -47,7 +47,6 @@ def concat_sequences(sequences_paths:list, target_path):
     nii_list = register_images(*nii_list)
 
     concat_img = sitk.JoinSeries(nii_list) # all sequences
-
     #concat_img = sitk.JoinSeries(nii_list[2], nii_list[2], nii_list[2]) # DWI only
 
     sitk.WriteImage(concat_img, target_path)

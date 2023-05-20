@@ -25,18 +25,22 @@ for n,p in model.named_parameters():
             print(f"***** {n} OK")
 """
 
-train_loader = BrainCLIPDataLoader("train", batch_size=16)
-val_loader = BrainCLIPDataLoader("valid", batch_size=16)
+train_loader = BrainCLIPDataLoader("train", batch_size=1)
+val_loader = BrainCLIPDataLoader("valid", batch_size=1)
 
 
 
-learning_rate = 0.001
+learning_rate = 0.01
 optimizer = Adam(model.parameters(), lr=learning_rate)
 scheduler = MultiStepLR(optimizer, 
-                        milestones=[10,15,20,30,40,50,60,70], 
+                        milestones=[30,50,60,70], 
                         gamma = 0.1) 
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
 
-num_epochs = 10
+
+
+num_epochs = 50
 train_losses = []
 val_losses = []
 
@@ -51,7 +55,7 @@ for epoch in range(num_epochs):
 
         loss.backward()
         optimizer.step()
-    #scheduler.step()
+    
 
     epoch_loss /= len(train_loader)
     train_losses.append(epoch_loss)
@@ -66,6 +70,8 @@ for epoch in range(num_epochs):
         val_loss /= len(val_loader)
         val_losses.append(val_loss)
     
+    scheduler.step(val_loss)
+
     print(f"Epoch {epoch + 1} loss: {epoch_loss:.4f}, val_loss: {val_loss:.4f}, lr:{optimizer.param_groups[0]['lr']}") 
     
     update_png(train_losses, val_losses, "brainclip_cls")
