@@ -9,13 +9,13 @@ from torch.optim.lr_scheduler import MultiStepLR
 
 device = get_device()
 
-train_loader = BrainCLIPDataLoader("train", batch_size=16)
-val_loader = BrainCLIPDataLoader("valid", batch_size=16)
+train_loader = BrainCLIPDataLoader("train", batch_size=8)
+val_loader = BrainCLIPDataLoader("valid", batch_size=8)
 
 image_encoder, text_encoder = ImageEncoder(), TextEncoder()
 model = BrainCLIP(image_encoder, text_encoder).to(device) # infarct, normal, others
 
-num_epochs = 100
+num_epochs = 300
 train_losses = []
 val_losses = []
 
@@ -36,7 +36,7 @@ scheduler = CyclicLR(optimizer,
                      cycle_momentum=False)
 
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)
+scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
 
 
 for epoch in range(num_epochs):
@@ -46,7 +46,6 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
 
         loss = model(images, input_id_report, attention_mask_report, label)
-        #print(loss)
         epoch_loss += loss.item()
 
         loss.backward()
@@ -65,9 +64,9 @@ for epoch in range(num_epochs):
         val_loss /= len(val_loader)
         val_losses.append(val_loss)
     
-    scheduler.step(epoch_loss)
+    scheduler.step(val_loss)
     
-    print(f"Epoch {epoch + 1} loss: {epoch_loss:.4f}, val_loss: {val_loss:.4f}, temperature: {model.temperature.item():.4f}, loss_weight: {model.loss_weight.item():.4f}, lr: {optimizer.param_groups[0]['lr']}") 
+    print(f"Epoch {epoch + 1} loss: {epoch_loss:.6f}, val_loss: {val_loss:.6f}, temperature: {model.temperature.item():.4f}, lr: {optimizer.param_groups[0]['lr']}") 
     
     update_png(train_losses, val_losses, "brainclip")
 

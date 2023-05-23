@@ -4,39 +4,43 @@ from transformers import DistilBertModel
 from torchvision.models.video import r3d_18
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+from brainclip.model.utils.file_utils import get_device
+from brainclip.model.network.buildingblocks import Encoder
 
 # Define the text encoder using the pretrained 3DResNet on Kinetic400 (r3d_18)
 class ImageEncoder(nn.Module):
-    def __init__(self, embedding_size=512):
+    def __init__(self, embedding_size=400):
         super(ImageEncoder, self).__init__()
         self.embedding_size=embedding_size 
 
         self.resnet3d_output_size = 400 # number of classes for kinetics400
         self.resnet3d = r3d_18(weights='KINETICS400_V1')
-        
-        # Use last layer (512 features) for embedding
-        num_ftrs = self.resnet3d.fc.in_features
-        self.resnet3d.fc = nn.Linear(num_ftrs, self.embedding_size)
-        
+
         for param in self.resnet3d.parameters():
             param.requires_grad_(True)
-        # freeze all layers except last one - Linear Probing
-        for param in self.resnet3d.fc.parameters():
-            param.requires_grad_(True)   
-
-        self.embedding_layer = self.resnet3d.fc
-
 
     def forward(self, x):
         x = self.resnet3d(x)
-        x = self.embedding_layer(x)
+        return x
+    
+class ImageEncoder(Encoder):
+    def __init__(self, embedding_size=400):
+        self.embedding_size =embedding_size
+        super(ImageEncoder, self).__init__(in_channels=3, out_channels=3)
+        self.flatten = nn.Flatten()
+        self.fc = nn.Linear(56*56*8*3, embedding_size)
+
+    def forward(self, x):
+        x = super(ImageEncoder, self).forward(x)
+        x = self.flatten(x)
+        x = self.fc(x)
         return x
     
 
 
 # Define the text encoder using the pretrained DistilBERT
 class TextEncoder(nn.Module):
-    def __init__(self, embedding_size=512):
+    def __init__(self, embedding_size=400):
         super(TextEncoder, self).__init__()
         self.embedding_size=embedding_size
         self.distilbert_output_size = 768
@@ -51,29 +55,30 @@ class TextEncoder(nn.Module):
         x = self.embedding_layer(CLS_token_state)
         return x
 
+    
 class ProjectionHead(nn.Module):
     def __init__(
         self,
         embedding_dim,
-        projection_dim=300,
+        projection_dim=256,
         dropout=0.2
     ):
         super().__init__()
         self.embedding_dim = embedding_dim
         self.projection_dim = projection_dim
 
-        self.projection = nn.Linear(self.embedding_dim, self.projection_dim)
-        self.relu = nn.ReLU()
-        self.fc = nn.Linear(self.projection_dim, self.projection_dim)
-        self.dropout = nn.Dropout(dropout)
-        self.layer_norm = nn.LayerNorm(self.projection_dim)
+        self.projection = nn.Linear(self.embedding_dim, self.projection_dim, bias = False)
+        #self.relu = nn.ReLU()
+        #self.fc = nn.Linear(self.projection_dim, self.projection_dim)
+        #self.dropout = nn.Dropout(dropout)
+        #self.layer_norm = nn.LayerNorm(self.projection_dim)
     
     def forward(self, x):
-        projected = self.projection(x)
-        x = self.relu(projected)
-        x = self.dropout(x)
-        x = x + projected
-        x = self.layer_norm(x)
+        x = self.projection(x) # projected = self.projection(x)
+        #x = self.relu(projected)
+        #x = self.dropout(x)
+        #x = x + projected
+        #x = self.layer_norm(x)
         return x
 
 # Define the CLIP model architecture
@@ -86,28 +91,22 @@ class BrainCLIP(nn.Module):
             embedding_dim=self.image_encoder.embedding_size)
         self.text_projection = ProjectionHead(
             embedding_dim=self.text_encoder.embedding_size)
-        self.temperature = nn.Parameter(torch.tensor([0.07]), requires_grad=True) # 0.07 in paper
+        self.temperature = nn.Parameter(torch.tensor(1.)) # 0.07 in paper
         self.loss_weight = nn.Parameter(torch.tensor([0.5]), requires_grad=True)
         self.parameter_list = nn.ParameterList([self.temperature, self.loss_weight])
-        #self.temperature = 1 #0.07
-        from brainclip.model.utils.file_utils import get_device
-        self.targets = torch.arange(512).to(get_device())
+        self.device = get_device()
+        self.loss_state = {"matching":[],"non_matching":[]}
 
-    def cross_entropy(self, preds, targets, reduction='none'):
-        log_softmax = nn.LogSoftmax(dim=-1)
-        loss = (-targets * log_softmax(preds)).sum(1)
-        if reduction == "none":
-            return loss
-        elif reduction == "mean":
-            return loss.mean()
 
     def plot_similarity(self, similarity_matrix, label):
         similarity_matrix = similarity_matrix.detach().cpu().numpy()
         label = [torch.argmax(l).detach().cpu().numpy() for l in label]
+        classes = ['infarct (0)', 'tumor (1)', 'hemorrhage (2)', 'normal (3)', 'others (4)']
 
-        plt.imshow(similarity_matrix, cmap='hot', interpolation='nearest', vmin=0, vmax=1)
+        plt.imshow(similarity_matrix, cmap='magma', interpolation='nearest', vmin=-1, vmax=1)
         plt.colorbar()
-        plt.title('Similarity Matrix')
+        plt.suptitle('Similarity Matrix')
+        plt.title(''.join(classes))
         plt.xlabel('Texts') 
         plt.ylabel('Images')
         plt.xticks(range(len(label)), label)
@@ -115,79 +114,52 @@ class BrainCLIP(nn.Module):
         plt.savefig("/datadrive_m2/alice/brain-CLIP/brainclip/model/experiments/sim.png")
         plt.close()
 
-    def cosine_similarity(self, A, B):
-        clampled_loss_weight = torch.clamp(self.loss_weight, 0.5, 1)
+    def monitor_loss(self, sim):
+        batch_size = sim.size(0)
+        mask = torch.eye(batch_size, dtype=torch.bool, device=sim.device)
+        matching_loss = sim[mask].mean()
+        non_matching_loss = sim[~mask].mean()
 
-        A_norm = torch.nn.functional.normalize(A, dim=1)
-        B_norm = torch.nn.functional.normalize(B, dim=1)
+        print_m = (1-matching_loss).detach().cpu().numpy()
+        print_nm = non_matching_loss.detach().cpu().numpy()
+        print(f"\tMl:{print_m:3f}, nMl:{print_nm:3f}")
 
-        A_norm = clampled_loss_weight * A_norm
-        B_norm = (1-clampled_loss_weight) * B_norm
+        self.loss_state["matching"].append(print_m)
+        self.loss_state["non_matching"].append(print_nm)
 
-        similarity = torch.matmul(A_norm, B_norm.T)
-        return similarity
-    
-    def cosine_similarity(self, A, B):
-        clampled_loss_weight = torch.clamp(self.loss_weight, 0.5, 1)
+        plt.plot(range(len(self.loss_state["matching"])), self.loss_state["matching"], c="g", label='matching loss')
+        plt.plot(range(len(self.loss_state["non_matching"])), self.loss_state["non_matching"], c="b", label='not matching loss')
+        plt.axhline(0, c="grey")
+        plt.legend()
+        plt.xlabel("Per batch loss")
 
-        A_norm = torch.nn.functional.normalize(A, dim=1)
-        B_norm = torch.nn.functional.normalize(B, dim=1)
+        plt.savefig("/datadrive_m2/alice/brain-CLIP/brainclip/model/experiments/matching_loss.png")
+        plt.close()
 
-        #A_norm = clampled_loss_weight * A_norm
-        #B_norm = (1-clampled_loss_weight) * B_norm
-
-        similarity = A_norm @ B_norm.T
-        return similarity
-
-
-    def contrastive_loss(self, text_embeddings, image_embeddings, label):
-        #clampled_loss_weight = torch.clamp(self.loss_weight, 0.5, 1)
-
-        #image_embeddings = F.normalize(image_embeddings, dim=-1)
-        #text_embeddings = F.normalize(text_embeddings, dim=-1)
-
-        #logits = (text_embeddings @ image_embeddings.T) / self.temperature
-        images_similarity = image_embeddings @ image_embeddings.T
-        texts_similarity = text_embeddings @ text_embeddings.T
-
-        similarity_matrix = self.cosine_similarity(images_similarity, texts_similarity)
-        #similarity_matrix = self.cosine_similarity(image_embeddings, text_embeddings)
-
-
-
-        batch_size = similarity_matrix.size(0)
-        mask = torch.eye(batch_size, dtype=torch.bool, device=similarity_matrix.device)
-        matching_loss = similarity_matrix[mask].mean()
-        non_matching_loss = similarity_matrix[~mask].mean()
-        loss = ((1-matching_loss) + non_matching_loss) / 2
-
-        print((1-matching_loss).detach().cpu().numpy(), non_matching_loss.detach().cpu().numpy())
-
-        self.plot_similarity(similarity_matrix, label)
-        
-        #self.targets = F.softmax(
-        #    (images_similarity + texts_similarity) / 2 * self.temperature, dim=-1
-        #)   
-
-        #texts_loss = self.cross_entropy(logits, self.targets, reduction='none')
-        #images_loss = self.cross_entropy(logits.T, self.targets.T, reduction='none')
-
-        #loss = (clampled_loss_weight*images_loss + (1-clampled_loss_weight)*texts_loss) / 2 # shape: (batch_size)
-        #return loss.mean()
-        return loss
-
-    
 
     def forward(self, image, input_id_report, attention_mask_report, label):
-        image_embedding = self.image_encoder(image)
-        text_embedding = self.text_encoder(input_id_report, attention_mask_report)
+        I_f = self.image_encoder(image) 
+        T_f = self.text_encoder(input_id_report, attention_mask_report)
 
-        image_embedding = self.image_projection(image_embedding)
-        text_embedding = self.text_projection(text_embedding)
+        W_i = self.image_projection(I_f)
+        W_t = self.text_projection(T_f)
 
-        # Calculating the Loss
-        ctrs_loss = self.contrastive_loss(image_embedding, text_embedding, label)
-        return ctrs_loss
+        I_e, T_e = map(lambda t: F.normalize(t, p = 2, dim = -1), (W_i, W_t))
+        sim = torch.einsum('i d, j d -> i j', I_e, T_e) # i, j == batch_size
+        self.plot_similarity(sim, label)
+        sim *= self.temperature.exp()
+
+        labels = torch.arange(I_f.size(0), device=self.device)
+        I_loss = F.cross_entropy(sim, labels)
+        T_loss = F.cross_entropy(sim.T, labels)
+
+        loss = (I_loss + T_loss) / 2
+        
+        self.monitor_loss(sim)
+
+        return loss
+    
+
 
 """
 
