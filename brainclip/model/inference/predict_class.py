@@ -9,7 +9,7 @@ import numpy as np
 
 device = get_device()
 
-model = BrainCLIPClassifier(ImageEncoder(), TextEncoder(), 2, inference=True).to(device)
+model = BrainCLIPClassifier(ImageEncoder(), TextEncoder(), 5, inference=True).to(device)
 loaded_model = torch.load(classification_model_path, map_location=device)
 model.load_state_dict(loaded_model, strict=False)
 model.eval()

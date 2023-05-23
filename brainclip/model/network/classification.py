@@ -8,12 +8,13 @@ from torch.optim.lr_scheduler import MultiStepLR
 
 device = get_device()
 
-model = BrainCLIPClassifier(ImageEncoder(), TextEncoder(), 2).to(device)
+model = BrainCLIPClassifier(ImageEncoder(), TextEncoder(), 5).to(device)
 loaded_model = torch.load(final_model_path, map_location=device)
 model.load_state_dict(loaded_model, strict=False)
+
 for name, param in model.named_parameters():
-    if any([p for p in param if p is None]): print(name)
-    if not name.startswith("braincls_"): param.requires_grad = False
+    #if any([p for p in param if p is None]): print(name)
+    if not name.startswith("bcls_"): param.requires_grad = False
 
 
 """

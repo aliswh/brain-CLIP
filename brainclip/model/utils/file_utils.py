@@ -27,7 +27,7 @@ def update_png(loss_history, val_loss_history=None, prefix=""):
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Loss')
 
-    ax.set_ylim([0, 0.5])
+    #ax.set_ylim([0, 0.5])
 
     plt.savefig(f"{experiments_folder}/{prefix}_loss.png")
     plt.close(fig)

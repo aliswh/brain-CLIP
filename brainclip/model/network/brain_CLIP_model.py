@@ -241,7 +241,7 @@ class BrainCLIPClassifier(BrainCLIP):
 
 
     def classification_loss(self, cls_output, label):
-        loss = nn.BCELoss()
+        loss = F.cross_entropy
         return loss(cls_output, label)
 
     def forward(self, image, input_id_report, attention_mask_report, label):
@@ -251,11 +251,11 @@ class BrainCLIPClassifier(BrainCLIP):
 
         # classification
         x = self.braincls_fc1(image_embedding)
-        x = self.braincls_relu1(x)
+        #x = self.braincls_relu1(x)
         #x = self.braincls_fc2(x)
         #x = self.braincls_relu2(x)
         x = self.braincls_fc3(x)
-        x = self.braincls_relu3(x)
+        #x = self.braincls_relu3(x)
         logits = self.braincls_softmax(x)
         
         if self.inference: 
@@ -265,3 +265,43 @@ class BrainCLIPClassifier(BrainCLIP):
 
 
 
+class BrainCLIPClassifier(BrainCLIP):
+    def __init__(self, image_encoder, text_encoder, num_classes, inference=False):
+        super().__init__(image_encoder, text_encoder)
+        self.num_classes = num_classes
+        self.inference=inference
+    
+        # classification nn
+        self.bcls_conv = nn.Conv1d(2, 8, kernel_size=5)
+        self.bcls_relu = nn.ReLU()
+        self.bcls_pool = nn.MaxPool1d(kernel_size=2)
+        self.bcls_flatten = nn.Flatten() 
+        self.bcls_fc = nn.Linear(1008, self.num_classes)
+        self.bcls_softmax = nn.Softmax(dim=1)
+
+
+    def classification_loss(self, cls_output, label):
+        loss = nn.CrossEntropyLoss()
+        return loss(cls_output, label)
+
+    def forward(self, image, input_id_report, attention_mask_report, label):
+        # extract features
+        image_embedding = self.image_encoder(image)
+        text_embedding = self.text_encoder(input_id_report, attention_mask_report)
+
+        image_embedding = self.image_projection(image_embedding)
+        text_embedding = self.text_projection(text_embedding)
+        
+        # stack together
+        features = torch.stack((image_embedding, text_embedding), dim=1)
+
+        # classification
+        x = self.bcls_conv(features)
+        x = self.bcls_relu(x)
+        x = self.bcls_pool(x)
+        x = self.bcls_flatten(x)
+        x = self.bcls_fc(x)
+        logits = self.bcls_softmax(x)
+        
+        if self.inference: return logits
+        else: return self.classification_loss(logits, label)
