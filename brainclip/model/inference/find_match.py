@@ -70,8 +70,8 @@ def find_matches(model, device, query, n=5):
     print(values, ''.join(matches), sep="\n")
     #print(correct_prediction(ground_truth, cls_pred))
 
-def sort_similarities(similarity, image_filenames, valid_reports):
-    d = [[path, text, score] for score, path, text in zip(similarity, image_filenames, valid_reports)]
+def sort_similarities(similarity, image_filenames, valid_reports, ground_truth):
+    d = [[os.path.basename(path[0]), text, score, label] for score, path, text, label in zip(similarity, image_filenames, valid_reports, ground_truth)]
     d = sorted(d, key=lambda x: -x[2])
     d = [[*obj, rank] for obj, rank in zip(d, range(1,len(d)+1))]
     return d
@@ -82,7 +82,7 @@ def cosine_similarity(A, B):
     similarity = torch.einsum('i d, j d -> i j', A_norm, B_norm) #A_norm @ B_norm.T
     return similarity
 
-def find_matches(model, device, query, n=5):
+def find_matches(model, device, query, label, n=5):
 
     image_embeddings, image_filenames, ground_truth, valid_reports = get_image_embeddings(model, device)
     text_embeddings = get_text_embeddings(model, device, query)
@@ -90,7 +90,7 @@ def find_matches(model, device, query, n=5):
     similarity = cosine_similarity(image_embeddings, text_embeddings)
     similarity = torch.squeeze(similarity)
     similarity = similarity.cpu().numpy()
-    similarity = sort_similarities(similarity, image_filenames, valid_reports)
+    similarity = sort_similarities(similarity, image_filenames, valid_reports, ground_truth)
     
     """Plot matches function""" # TODO
     torch.set_printoptions(precision=3)
@@ -100,17 +100,35 @@ def find_matches(model, device, query, n=5):
     #    print(*match[::-1], sep="\n", end="\n\n")
 
     matches = {}
+    top_matches = {}
+
+    decode_label = lambda x: str(x.argmax(dim=1).cpu().numpy()[0])
+
+    for match in similarity[:n]:
+        top_matches[str(match[4])] = { # rank
+                    "image_path":match[0],
+                    "report":match[1],
+                    "score":str(match[2]),
+                    "label":decode_label(match[3]),
+                    "rank":str(match[4]),
+                    "query":query,
+                    "gt":decode_label(label),
+                }
+
     for match in similarity:
         if match[1] == query: 
             #print(f"--- {match[3]}, {match[2]}") 
-            matches[str(match[3])] = { # rank
+            matches[str(match[4])] = { # rank
                 "image_path":match[0],
                 "report":match[1],
                 "score":str(match[2]),
-                "rank":str(match[3])
+                "label":decode_label(match[3]),
+                "rank":str(match[4]),
+                "query":query,
+                "gt":decode_label(label),
             }
 
-    return matches
+    return top_matches, matches
 
 
 device = get_device()
@@ -142,17 +160,27 @@ find_matches(brainclip_model,
              )
 """
 eval_dict = {}
-for f, report in zip(image_filenames, valid_reports):
+top_matches = {}
+for f, report, label in zip(image_filenames, valid_reports, ground_truth):
     f = os.path.basename(f[0])
-    d = find_matches(brainclip_model, 
+    fd, d = find_matches(brainclip_model, 
              device,
              query=report,
-             n=3
+             label=label,
+             n=27
              )
     eval_dict[f] = {
         "matches":d
     }
+    top_matches[f] = {
+        "matches":fd
+    }
 
-print(eval_dict)
+
+#print(eval_dict)
 with open(experiments_folder+"test_matches.json", "w") as f:
     json.dump(eval_dict, f)
+
+#print(eval_dict)
+with open(experiments_folder+"top_matches.json", "w") as f:
+    json.dump(top_matches, f)
