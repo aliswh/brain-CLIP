@@ -1,4 +1,5 @@
 # ignore data
+data/
 *.csv
 *.xlsx
 *.nii.gz
