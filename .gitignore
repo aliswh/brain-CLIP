@@ -1,4 +1,6 @@
 # ignore data
+*.csv
+*.xlsx
 *.nii.gz
 *.nii
 *.npy
