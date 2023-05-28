@@ -6,6 +6,9 @@ data/
 *.nii
 *.npy
 *.model
+test.json
+train.json
+valid.json
 
 # Ignore PyTorch model files
 *.pt
