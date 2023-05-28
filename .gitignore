@@ -6,9 +6,7 @@ data/
 *.nii
 *.npy
 *.model
-test.json
-train.json
-valid.json
+*/match_eval.ipynb
 
 # Ignore PyTorch model files
 *.pt

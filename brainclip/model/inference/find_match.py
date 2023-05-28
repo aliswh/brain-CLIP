@@ -53,23 +53,6 @@ def correct_prediction(ground_truth, predictions):
     ground_truth = [torch.argmax(p) for p in ground_truth]
     return [gt==p for gt,p in zip(ground_truth,predictions)]
 
-def find_matches(model, device, query, n=5):
-    text_embeddings = get_text_embeddings(model, device, query)
-    
-    image_embeddings_n = F.normalize(image_embeddings, p=2, dim=-1) 
-    text_embeddings_n = F.normalize(text_embeddings, p=2, dim=-1)
-    dot_similarity = text_embeddings_n @ image_embeddings_n.T
-
-    values, indices = torch.topk(dot_similarity.squeeze(0), n)
-
-    matches = [f"{torch.argmax(ground_truth[idx])} {image_filenames[idx]}:\n{valid_reports[idx]}\n" for idx in indices]
-    
-    """Plot matches function""" # TODO
-    torch.set_printoptions(precision=10)
-
-    print(values, ''.join(matches), sep="\n")
-    #print(correct_prediction(ground_truth, cls_pred))
-
 def sort_similarities(similarity, image_filenames, valid_reports, ground_truth):
     d = [[os.path.basename(path[0]), text, score, label] for score, path, text, label in zip(similarity, image_filenames, valid_reports, ground_truth)]
     d = sorted(d, key=lambda x: -x[2])
@@ -92,13 +75,6 @@ def find_matches(model, device, query, label, n=5):
     similarity = similarity.cpu().numpy()
     similarity = sort_similarities(similarity, image_filenames, valid_reports, ground_truth)
     
-    """Plot matches function""" # TODO
-    torch.set_printoptions(precision=3)
-
-    #print(f"On {len(similarity)} images: ***\t{query}")
-    #for match in similarity[:n]:
-    #    print(*match[::-1], sep="\n", end="\n\n")
-
     matches = {}
     top_matches = {}
 
@@ -139,26 +115,7 @@ brainclip_model.eval()
 
 image_embeddings, image_filenames, ground_truth, valid_reports = get_image_embeddings(brainclip_model, device)
 
-print("\n\n\n")
-"""
-find_matches(brainclip_model, 
-             device, # 258
-             query="Normal study of brain. No acute infarcts / haemorrhage / focal lesions. Vascular loop from right superior cerebellar artery is seen indenting the cisternal segment of right trigeminal nerve - suggested clinical correlation to r/o trigeminal neuralgia.",
-             n=3
-             )
 
-find_matches(brainclip_model, 
-             device, # 985
-             query="Late sub acute infarct in right corona radiata. Early / late sub acute infarct in splenium of corpus callosum in right side and right occipital lobe with mild gliosis. Grade II global cortical atrophy with scattered punctate white matter ischaemic changes. No haemorrhage / focal lesions. A1 segment of right ACA is hypoplastic. Rest of MRA normal. Normal MRV.",
-             n=3
-             )
-
-find_matches(brainclip_model, 
-             device,
-             query="No significant abnormality is seen in the brain.",
-             n=3
-             )
-"""
 eval_dict = {}
 top_matches = {}
 for f, report, label in zip(image_filenames, valid_reports, ground_truth):

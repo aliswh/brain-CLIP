@@ -5,7 +5,7 @@ from brainclip.model.network.data_loader import BrainCLIPDataLoader
 import torch.nn as nn
 from torch.optim import Adam
 import torch
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import MultiStepLR, CyclicLR, ReduceLROnPlateau
 
 device = get_device()
 
@@ -20,22 +20,6 @@ train_losses = []
 val_losses = []
 
 optimizer = Adam(model.parameters(), lr=0.01)
-
-# batch size 8, epochs=200, trloss: 0.17, val_loss: 0.18
-scheduler = MultiStepLR(optimizer, 
-                        milestones=[10,20,30,40,50,60,70], 
-                        gamma = 0.1) 
-
-from torch.optim.lr_scheduler import CyclicLR
-
-scheduler = CyclicLR(optimizer, 
-                     base_lr = 1e-5, # Initial learning rate which is the lower boundary in the cycle for each parameter group
-                     max_lr = 1e-1, # Upper learning rate boundaries in the cycle for each parameter group
-                     step_size_up = 12, # Number of training iterations in the increasing half of a cycle
-                     mode = "triangular2",
-                     cycle_momentum=False)
-
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
 
 

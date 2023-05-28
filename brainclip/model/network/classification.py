@@ -4,7 +4,8 @@ from brainclip.model.network.brain_CLIP_model import BrainCLIPClassifier, ImageE
 from brainclip.model.network.data_loader import BrainCLIPDataLoader
 from torch.optim import Adam, SGD
 import torch
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+
 
 device = get_device()
 
@@ -33,12 +34,7 @@ val_loader = BrainCLIPDataLoader("valid", batch_size=1)
 
 learning_rate = 0.01
 optimizer = Adam(model.parameters(), lr=learning_rate)
-scheduler = MultiStepLR(optimizer, 
-                        milestones=[30,50,60,70], 
-                        gamma = 0.1) 
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
-
 
 
 num_epochs = 50

@@ -23,6 +23,7 @@ class ImageEncoder(nn.Module):
         x = self.resnet3d(x)
         return x
     
+# 3D unet based encoder    
 class ImageEncoder(Encoder):
     def __init__(self, embedding_size=400):
         self.embedding_size =embedding_size
@@ -38,7 +39,7 @@ class ImageEncoder(Encoder):
     
 
 
-# Define the text encoder using the pretrained DistilBERT
+# pretrained DistilBERT
 class TextEncoder(nn.Module):
     def __init__(self, embedding_size=400):
         super(TextEncoder, self).__init__()
@@ -158,70 +159,9 @@ class BrainCLIP(nn.Module):
         self.monitor_loss(sim)
 
         return loss
-    
 
 
-"""
-
-
-
-
-class BrainCLIPClassifier(nn.Module):
-    def __init__(self, brainclip_model, num_classes, inference=False):
-        super(BrainCLIPClassifier, self).__init__()
-        self.num_classes = num_classes
-
-        # brainCLIP
-        self.inference = inference
-        self.model = brainclip_model
-
-        self.image_encoder = self.model.image_encoder
-        self.text_encoder = self.model.text_encoder
-
-        self.image_projection = ProjectionHead(
-            embedding_dim=self.image_encoder.embedding_size,
-            projection_dim=self.image_encoder.embedding_size)
-        self.text_projection = ProjectionHead(
-            embedding_dim=self.text_encoder.embedding_size,
-            projection_dim=self.text_encoder.embedding_size)
-        
-        # classification nn
-        self.conv = nn.Conv1d(2, 8, kernel_size=5)
-        self.relu = nn.ReLU()
-        self.pool = nn.MaxPool1d(kernel_size=2)
-        self.flatten = nn.Flatten() 
-        self.fc = nn.Linear(2032, self.num_classes)
-        self.softmax = nn.Softmax(dim=1)
-
-
-    def classification_loss(self, cls_output, label):
-        loss = nn.CrossEntropyLoss()
-        return loss(cls_output, label)
-
-    def forward(self, image, input_id_report, attention_mask_report, label):
-        # extract features
-        image_embedding = self.image_encoder(image)
-        text_embedding = self.text_encoder(input_id_report, attention_mask_report)
-
-        image_embedding = self.image_projection(image_embedding)
-        text_embedding = self.text_projection(text_embedding)
-        
-        # stack together
-        features = torch.stack((image_embedding, text_embedding), dim=1)
-
-        # classification
-        x = self.conv(features)
-        x = self.relu(x)
-        x = self.pool(x)
-        x = self.flatten(x)
-        x = self.fc(x)
-        logits = self.softmax(x)
-        
-        if self.inference: return logits
-        else: return self.classification_loss(logits, label)
-
-"""
-
+# Image-only classifier
 class BrainCLIPClassifier(BrainCLIP):
     def __init__(self, image_encoder, text_encoder, num_classes, inference=False):
         super().__init__(image_encoder, text_encoder)
@@ -264,7 +204,7 @@ class BrainCLIPClassifier(BrainCLIP):
 
 
 
-
+# Image-text classifier
 class BrainCLIPClassifier(BrainCLIP):
     def __init__(self, image_encoder, text_encoder, num_classes, inference=False):
         super().__init__(image_encoder, text_encoder)
